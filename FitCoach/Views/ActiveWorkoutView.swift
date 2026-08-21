@@ -8,14 +8,21 @@ struct ActiveWorkoutView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var currentExerciseIndex: Int
+    @State private var focusedSetID: UUID?
     @State private var showingFinishConfirmation = false
     @State private var errorMessage: String?
     @State private var hapticTrigger = 0
+    @State private var pendingValueSave: Task<Void, Never>?
     @State private var pendingTextSave: Task<Void, Never>?
 
     init(session: WorkoutSession) {
         self.session = session
-        _currentExerciseIndex = State(initialValue: session.activeExerciseIndex)
+        let exercises = session.sortedExercises
+        let requestedIndex = session.activeExerciseIndex
+        let safeIndex = exercises.indices.contains(requestedIndex) ? requestedIndex : 0
+        let initialExercise = exercises.indices.contains(safeIndex) ? exercises[safeIndex] : nil
+        _currentExerciseIndex = State(initialValue: safeIndex)
+        _focusedSetID = State(initialValue: initialExercise?.sortedSets.first(where: { !$0.isCompleted })?.id)
     }
 
     private var exercises: [ExerciseEntry] { session.sortedExercises }
@@ -29,46 +36,59 @@ struct ActiveWorkoutView: View {
         currentExercise?.sortedSets.first(where: { !$0.isCompleted })
     }
 
+    private var currentActionSet: WorkoutSet? {
+        guard let currentExercise else { return nil }
+        return currentExercise.sortedSets.first(where: { $0.id == focusedSetID && !$0.isCompleted })
+            ?? nextIncompleteSet
+    }
+
     var body: some View {
         Group {
             if session.status == .completed {
                 WorkoutCompletionView(session: session, onDismiss: { dismiss() })
             } else {
                 NavigationStack {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 18) {
-                            WorkoutProgressHeader(
-                                session: session,
-                                currentIndex: currentExerciseIndex,
-                                totalExercises: exercises.count
-                            )
-
-                            if let currentExercise {
-                                ExerciseSetEditor(
-                                    exercise: currentExercise,
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 18) {
+                                WorkoutProgressHeader(
                                     session: session,
-                                    onSetToggle: toggleSet,
-                                    onValueChange: saveDraft,
-                                    onTextChange: saveDraftDebounced
+                                    currentIndex: currentExerciseIndex,
+                                    totalExercises: exercises.count
                                 )
-                                .id(currentExercise.id)
-                                .transition(.opacity.combined(with: .move(edge: .trailing)))
-                            } else {
-                                ContentUnavailableView("没有训练动作", systemImage: "dumbbell")
-                            }
 
-                            if let restEndsAt = session.restEndsAt {
-                                RestTimerCard(endDate: restEndsAt) {
-                                    RestNotificationService.cancel(for: session.id)
-                                    session.restEndsAt = nil
-                                    saveDraft()
+                                if let currentExercise {
+                                    ExerciseSetEditor(
+                                        exercise: currentExercise,
+                                        focusedSetID: focusedSetID,
+                                        onFocusSet: { focus(on: $0.id) },
+                                        onSetToggle: toggleSet,
+                                        onValueChange: saveValueDraftDebounced,
+                                        onTextChange: saveDraftDebounced
+                                    )
+                                    .id(currentExercise.id)
+                                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+                                } else {
+                                    ContentUnavailableView("没有训练动作", systemImage: "dumbbell")
                                 }
-                                .transition(.scale(scale: 0.96).combined(with: .opacity))
+                            }
+                            .padding(.horizontal, AppTheme.pagePadding)
+                            .padding(.top, 8)
+                            .padding(.bottom, session.restEndsAt == nil ? 120 : 176)
+                        }
+                        .onChange(of: focusedSetID) { _, target in
+                            guard let target else { return }
+                            Task { @MainActor in
+                                await Task.yield()
+                                if reduceMotion {
+                                    proxy.scrollTo(target, anchor: .center)
+                                } else {
+                                    withAnimation(.snappy(duration: 0.24)) {
+                                        proxy.scrollTo(target, anchor: .center)
+                                    }
+                                }
                             }
                         }
-                        .padding(.horizontal, AppTheme.pagePadding)
-                        .padding(.top, 8)
-                        .padding(.bottom, 120)
                     }
                     .background(AppTheme.canvas)
                     .navigationTitle(session.student?.name ?? "训练中")
@@ -94,9 +114,11 @@ struct ActiveWorkoutView: View {
                     }
                     .safeAreaInset(edge: .bottom) {
                         WorkoutBottomControls(
-                            currentSetNumber: nextIncompleteSet.map { $0.sortIndex + 1 },
+                            currentSetNumber: currentActionSet.map { $0.sortIndex + 1 },
+                            restEndsAt: session.restEndsAt,
                             canGoPrevious: currentExerciseIndex > 0,
                             isLastExercise: currentExerciseIndex >= exercises.count - 1,
+                            onSkipRest: skipRest,
                             onPrevious: previousExercise,
                             onCompleteCurrentSet: completeCurrentSet,
                             onNext: nextExercise,
@@ -110,6 +132,7 @@ struct ActiveWorkoutView: View {
         }
         .sensoryFeedback(.success, trigger: hapticTrigger)
         .onDisappear {
+            pendingValueSave?.cancel()
             pendingTextSave?.cancel()
             if modelContext.hasChanges { saveDraft() }
         }
@@ -154,9 +177,11 @@ struct ActiveWorkoutView: View {
             if set.isCompleted {
                 try service.undoSet(set, in: session)
                 RestNotificationService.cancel(for: session.id)
+                focus(on: set.id)
             } else {
                 try service.completeSet(set, in: session, restSeconds: restSeconds)
                 hapticTrigger += 1
+                focus(on: currentExercise?.sortedSets.first(where: { !$0.isCompleted })?.id)
                 if let restEndsAt = session.restEndsAt {
                     Task {
                         let scheduled = await RestNotificationService.schedule(
@@ -176,8 +201,24 @@ struct ActiveWorkoutView: View {
     }
 
     private func completeCurrentSet() {
-        guard let set = nextIncompleteSet, let exercise = currentExercise else { return }
+        guard let set = currentActionSet, let exercise = currentExercise else { return }
         toggleSet(set, restSeconds: exercise.plannedRestSeconds)
+    }
+
+    private func focus(on setID: UUID?) {
+        if reduceMotion {
+            focusedSetID = setID
+        } else {
+            withAnimation(.snappy(duration: 0.22)) {
+                focusedSetID = setID
+            }
+        }
+    }
+
+    private func skipRest() {
+        RestNotificationService.cancel(for: session.id)
+        session.restEndsAt = nil
+        saveDraft()
     }
 
     private func saveDraft() {
@@ -210,6 +251,18 @@ struct ActiveWorkoutView: View {
         }
     }
 
+    /// Rapid +/- taps should feel immediate while collapsing several synchronous
+    /// SwiftData saves into one short, bounded persistence window.
+    private func saveValueDraftDebounced() {
+        session.updatedAt = Date()
+        pendingValueSave?.cancel()
+        pendingValueSave = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(180))
+            guard !Task.isCancelled else { return }
+            saveDraft()
+        }
+    }
+
     private func previousExercise() {
         guard currentExerciseIndex > 0 else { return }
         move(to: currentExerciseIndex - 1)
@@ -228,6 +281,9 @@ struct ActiveWorkoutView: View {
         withAnimation(animation) {
             currentExerciseIndex = index
             session.activeExerciseIndex = index
+            focusedSetID = exercises.indices.contains(index)
+                ? exercises[index].sortedSets.first(where: { !$0.isCompleted })?.id
+                : nil
         }
         saveDraft()
     }
@@ -305,7 +361,8 @@ private struct WorkoutProgressHeader: View {
 private struct ExerciseSetEditor: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let exercise: ExerciseEntry
-    let session: WorkoutSession
+    let focusedSetID: UUID?
+    let onFocusSet: (WorkoutSet) -> Void
     let onSetToggle: (WorkoutSet, Int) -> Void
     let onValueChange: () -> Void
     let onTextChange: () -> Void
@@ -341,14 +398,29 @@ private struct ExerciseSetEditor: View {
                     .accessibilityIdentifier("workout.previousPerformance")
             }
 
-            ForEach(exercise.sortedSets) { set in
-                WorkoutSetRow(
-                    set: set,
-                    restSeconds: exercise.plannedRestSeconds,
-                    onToggle: { onSetToggle(set, exercise.plannedRestSeconds) },
-                    onValueChange: onValueChange,
-                    onTextChange: onTextChange
-                )
+            VStack(spacing: 0) {
+                ForEach(exercise.sortedSets) { set in
+                    Group {
+                        if set.id == focusedSetID && !set.isCompleted {
+                            WorkoutSetRow(
+                                set: set,
+                                restSeconds: exercise.plannedRestSeconds,
+                                onToggle: { onSetToggle(set, exercise.plannedRestSeconds) },
+                                onValueChange: onValueChange,
+                                onTextChange: onTextChange
+                            )
+                            .padding(.vertical, 8)
+                            .transition(.opacity.combined(with: .scale(scale: 0.985)))
+                        } else {
+                            CompactWorkoutSetRow(
+                                set: set,
+                                onSelect: { onFocusSet(set) },
+                                onUndo: { onSetToggle(set, exercise.plannedRestSeconds) }
+                            )
+                        }
+                    }
+                    .id(set.id)
+                }
             }
 
             if exercise.sortedSets.isEmpty {
@@ -379,9 +451,68 @@ private struct ExerciseSetEditor: View {
     }
 }
 
+private struct CompactWorkoutSetRow: View {
+    let set: WorkoutSet
+    let onSelect: () -> Void
+    let onUndo: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(set.isCompleted ? AppTheme.success : Color.secondary)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("第 \(set.sortIndex + 1) 组")
+                    .font(.subheadline.weight(.semibold))
+                Text(summary)
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            if set.isCompleted {
+                Button("撤销", action: onUndo)
+                    .font(.subheadline.weight(.semibold))
+                    .minimumTapTarget()
+                    .accessibilityLabel("撤销第 \(set.sortIndex + 1) 组完成")
+                    .accessibilityIdentifier("workout.set.\(set.sortIndex).complete")
+            } else {
+                Button(action: onSelect) {
+                    Label("编辑", systemImage: "chevron.right")
+                        .labelStyle(.iconOnly)
+                }
+                .minimumTapTarget()
+                .accessibilityLabel("编辑第 \(set.sortIndex + 1) 组")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .overlay(alignment: .bottom) {
+            Divider().padding(.leading, 44)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var summary: String {
+        let weight = set.actualWeightKg ?? set.plannedWeightKg
+        let reps = set.actualReps ?? set.plannedReps
+        var parts: [String] = []
+        if let weight { parts.append("\(weight.formatted()) kg") }
+        if let reps { parts.append("\(reps) 次") }
+        if let rpe = set.rpe { parts.append("RPE \(rpe.formatted())") }
+        return parts.isEmpty ? (set.isCompleted ? "已完成" : "待记录") : parts.joined(separator: " · ")
+    }
+}
+
 private struct WorkoutSetRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Bindable var set: WorkoutSet
+    @State private var valueHapticTrigger = 0
     let restSeconds: Int
     let onToggle: () -> Void
     let onValueChange: () -> Void
@@ -421,6 +552,7 @@ private struct WorkoutSetRow: View {
             }
         }
         .opacity(set.isCompleted ? 0.78 : 1)
+        .sensoryFeedback(.selection, trigger: valueHapticTrigger)
         .accessibilityElement(children: .contain)
     }
 
@@ -436,6 +568,7 @@ private struct WorkoutSetRow: View {
                 .foregroundStyle(set.isCompleted ? AppTheme.success : AppTheme.brand)
         }
         .minimumTapTarget()
+        .accessibilityLabel(set.isCompleted ? "撤销第 \(set.sortIndex + 1) 组完成" : "完成第 \(set.sortIndex + 1) 组")
         .accessibilityIdentifier("workout.set.\(set.sortIndex).complete")
     }
 
@@ -443,18 +576,24 @@ private struct WorkoutSetRow: View {
                     SetValueControl(
                         label: "重量",
                         value: weightText,
+                        unit: "千克",
+                        stepDescription: "2.5 千克",
                         decrease: { changeWeight(by: -2.5) },
                         increase: { changeWeight(by: 2.5) }
                     )
                     SetValueControl(
                         label: "次数",
                         value: "\(set.actualReps ?? set.plannedReps ?? 0)",
+                        unit: "次",
+                        stepDescription: "1 次",
                         decrease: { changeReps(by: -1) },
                         increase: { changeReps(by: 1) }
                     )
                     SetValueControl(
                         label: "RPE",
-                        value: (set.rpe ?? 7).formatted(),
+                        value: set.rpe?.formatted() ?? "—",
+                        unit: "",
+                        stepDescription: "0.5",
                         decrease: { changeRPE(by: -0.5) },
                         increase: { changeRPE(by: 0.5) }
                     )
@@ -468,17 +607,24 @@ private struct WorkoutSetRow: View {
     private func changeWeight(by amount: Double) {
         let current = set.actualWeightKg ?? set.plannedWeightKg ?? 0
         set.actualWeightKg = max(0, current + amount)
+        valueHapticTrigger += 1
         onValueChange()
     }
 
     private func changeReps(by amount: Int) {
         let current = set.actualReps ?? set.plannedReps ?? 0
         set.actualReps = max(0, current + amount)
+        valueHapticTrigger += 1
         onValueChange()
     }
 
     private func changeRPE(by amount: Double) {
-        set.rpe = min(10, max(1, (set.rpe ?? 7) + amount))
+        if let current = set.rpe {
+            set.rpe = min(10, max(1, current + amount))
+        } else {
+            set.rpe = 7
+        }
+        valueHapticTrigger += 1
         onValueChange()
     }
 }
@@ -486,6 +632,8 @@ private struct WorkoutSetRow: View {
 private struct SetValueControl: View {
     let label: String
     let value: String
+    let unit: String
+    let stepDescription: String
     let decrease: () -> Void
     let increase: () -> Void
 
@@ -494,103 +642,98 @@ private struct SetValueControl: View {
             Text(label)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            HStack(spacing: 0) {
-                Button(action: decrease) {
-                    Image(systemName: "minus")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ZStack {
+                HStack(spacing: 0) {
+                    Button(action: decrease) {
+                        Image(systemName: "minus")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .minimumTapTarget()
+                    .buttonRepeatBehavior(.enabled)
+
+                    Button(action: increase) {
+                        Image(systemName: "plus")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .minimumTapTarget()
+                    .buttonRepeatBehavior(.enabled)
                 }
-                .minimumTapTarget()
-                .accessibilityLabel("减少\(label)")
+
                 Text(value)
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
-                    .frame(minWidth: 32)
-                    .accessibilityLabel("\(label) \(value)")
-                Button(action: increase) {
-                    Image(systemName: "plus")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                .minimumTapTarget()
-                .accessibilityLabel("增加\(label)")
+                    .allowsHitTesting(false)
             }
             .frame(height: 44)
             .background(AppTheme.elevatedSurface, in: Capsule())
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(accessibilityValue)
+        .accessibilityHint("上下轻扫，每次调整 \(stepDescription)")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: increase()
+            case .decrement: decrease()
+            @unknown default: break
+            }
+        }
         .accessibilityIdentifier("workout.control.\(label)")
     }
-}
 
-private struct RestTimerCard: View {
-    let endDate: Date
-    let onSkip: () -> Void
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let remaining = max(0, Int(endDate.timeIntervalSince(context.date).rounded(.up)))
-            HStack(spacing: 14) {
-                Image(systemName: remaining > 0 ? "timer" : "checkmark")
-                    .font(.title2.weight(.semibold))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(remaining > 0 ? "自动休息" : "休息完成")
-                        .font(.subheadline.weight(.semibold))
-                    Text(remaining > 0 ? "\(remaining) 秒" : "可以开始下一组")
-                        .font(.title2.bold())
-                        .monospacedDigit()
-                }
-                Spacer()
-                if remaining > 0 {
-                    Button("跳过", action: onSkip)
-                        .buttonStyle(.bordered)
-                        .minimumTapTarget()
-                }
-            }
-            .padding(16)
-            .foregroundStyle(remaining > 0 ? Color.primary : AppTheme.success)
-            .background(AppTheme.brand.opacity(0.1), in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("workout.restTimer")
-            .sensoryFeedback(.success, trigger: remaining == 0)
-        }
+    private var accessibilityValue: String {
+        guard value != "—" else { return "未记录" }
+        return unit.isEmpty ? value : "\(value) \(unit)"
     }
 }
 
 private struct WorkoutBottomControls: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let currentSetNumber: Int?
+    let restEndsAt: Date?
     let canGoPrevious: Bool
     let isLastExercise: Bool
+    let onSkipRest: () -> Void
     let onPrevious: () -> Void
     let onCompleteCurrentSet: () -> Void
     let onNext: () -> Void
     let onFinish: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            Button(action: onPrevious) {
-                Image(systemName: "chevron.left")
-                    .frame(width: 44, height: 44)
+        VStack(spacing: 8) {
+            if let restEndsAt {
+                CompactRestStatus(endDate: restEndsAt, onSkip: onSkipRest)
             }
-            .disabled(!canGoPrevious)
-            .opacity(canGoPrevious ? 1 : 0.35)
-            .accessibilityLabel("上一个动作")
 
-            Button(action: primaryAction) {
-                Group {
-                    if dynamicTypeSize.isAccessibilitySize {
-                        Text(primaryTitle)
-                    } else {
-                        Label(primaryTitle, systemImage: primaryIcon)
-                    }
+            HStack(spacing: 10) {
+                Button(action: onPrevious) {
+                    Image(systemName: "chevron.left")
+                        .frame(width: 44, height: 44)
                 }
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 50)
+                .disabled(!canGoPrevious)
+                .opacity(canGoPrevious ? 1 : 0.35)
+                .accessibilityLabel("上一个动作")
+
+                Button(action: primaryAction) {
+                    Group {
+                        if dynamicTypeSize.isAccessibilitySize {
+                            Text(currentSetNumber == nil ? primaryTitle : "完成本组")
+                        } else {
+                            Label(primaryTitle, systemImage: primaryIcon)
+                        }
+                    }
+                    .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 50)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppTheme.brand)
+                .accessibilityLabel(primaryTitle)
+                .accessibilityIdentifier(primaryIdentifier)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(AppTheme.brand)
-            .accessibilityIdentifier(primaryIdentifier)
         }
         .floatingTrainingChrome()
     }
@@ -616,6 +759,37 @@ private struct WorkoutBottomControls: View {
             onFinish()
         } else {
             onNext()
+        }
+    }
+}
+
+private struct CompactRestStatus: View {
+    let endDate: Date
+    let onSkip: () -> Void
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let remaining = max(0, Int(endDate.timeIntervalSince(context.date).rounded(.up)))
+            HStack(spacing: 10) {
+                Label {
+                    Text(remaining > 0 ? "休息 \(remaining) 秒" : "休息完成")
+                        .monospacedDigit()
+                } icon: {
+                    Image(systemName: remaining > 0 ? "timer" : "checkmark.circle.fill")
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(remaining > 0 ? Color.primary : AppTheme.success)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("workout.restTimer")
+
+                Spacer(minLength: 8)
+
+                Button(remaining > 0 ? "跳过" : "收起", action: onSkip)
+                    .font(.subheadline.weight(.semibold))
+                    .minimumTapTarget()
+                    .accessibilityLabel(remaining > 0 ? "跳过休息" : "收起休息状态")
+            }
+            .sensoryFeedback(.success, trigger: remaining == 0)
         }
     }
 }

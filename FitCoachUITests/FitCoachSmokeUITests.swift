@@ -31,10 +31,20 @@ final class FitCoachSmokeUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["workout.previousPerformance"].waitForExistence(timeout: 5))
         for exerciseIndex in 0..<3 {
-            for _ in 0..<3 {
+            for setIndex in 0..<3 {
                 let completeCurrent = app.buttons["workout.completeCurrentSet"]
                 XCTAssertTrue(completeCurrent.waitForExistence(timeout: 2))
                 completeCurrent.tap()
+                if exerciseIndex == 0 && setIndex == 0 {
+                    let nextSet = app.buttons["workout.set.1.complete"]
+                    XCTAssertTrue(nextSet.waitForExistence(timeout: 1))
+                    XCTAssertTrue(nextSet.isHittable)
+                    XCTAssertTrue(app.descendants(matching: .any)["workout.control.重量"].isHittable)
+                    let attachment = XCTAttachment(screenshot: app.screenshot())
+                    attachment.name = "Progressive-current-set-and-rest"
+                    attachment.lifetime = .keepAlways
+                    add(attachment)
+                }
             }
             XCTAssertTrue(app.descendants(matching: .any)["workout.restTimer"].waitForExistence(timeout: 2))
             if exerciseIndex < 2 {
@@ -80,7 +90,7 @@ final class FitCoachSmokeUITests: XCTestCase {
 
         let restoredSet = app.buttons["workout.set.0.complete"]
         XCTAssertTrue(restoredSet.waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForLabel("已完成", on: restoredSet, timeout: 3))
+        XCTAssertTrue(waitForLabelContaining("撤销第 1 组完成", on: restoredSet, timeout: 3))
         XCTAssertTrue(app.descendants(matching: .any)["workout.restTimer"].exists)
     }
 
@@ -93,13 +103,14 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertTrue(start.waitForExistence(timeout: 5))
         start.tap()
 
-        let increaseWeight = app.buttons["增加重量"].firstMatch
-        let decreaseReps = app.buttons["减少次数"].firstMatch
-        let increaseRPE = app.buttons["增加RPE"].firstMatch
-        XCTAssertTrue(increaseWeight.waitForExistence(timeout: 5))
-        increaseWeight.tap()
-        decreaseReps.tap()
-        increaseRPE.tap()
+        let weight = app.descendants(matching: .any)["workout.control.重量"].firstMatch
+        let reps = app.descendants(matching: .any)["workout.control.次数"].firstMatch
+        let rpe = app.descendants(matching: .any)["workout.control.RPE"].firstMatch
+        XCTAssertTrue(weight.waitForExistence(timeout: 5))
+        XCTAssertEqual(rpe.value as? String, "未记录")
+        tapAdjustment(on: weight, increment: true)
+        tapAdjustment(on: reps, increment: false)
+        tapAdjustment(on: rpe, increment: true)
 
         let note = app.textFields["第 1 组备注"]
         XCTAssertTrue(note.exists)
@@ -114,9 +125,13 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertTrue(resume.waitForExistence(timeout: 5))
         resume.tap()
 
-        XCTAssertTrue(app.staticTexts["重量 22.5"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["次数 9"].exists)
-        XCTAssertTrue(app.staticTexts["RPE 7.5"].exists)
+        let restoredWeight = app.descendants(matching: .any)["workout.control.重量"].firstMatch
+        let restoredReps = app.descendants(matching: .any)["workout.control.次数"].firstMatch
+        let restoredRPE = app.descendants(matching: .any)["workout.control.RPE"].firstMatch
+        XCTAssertTrue(restoredWeight.waitForExistence(timeout: 5))
+        XCTAssertEqual(restoredWeight.value as? String, "22.5 千克")
+        XCTAssertEqual(restoredReps.value as? String, "9 次")
+        XCTAssertEqual(restoredRPE.value as? String, "7")
         XCTAssertEqual(app.textFields["第 1 组备注"].value as? String, "膝盖稳定")
     }
 
@@ -164,6 +179,20 @@ final class FitCoachSmokeUITests: XCTestCase {
             object: element
         )
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func waitForLabelContaining(_ text: String, on element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", text),
+            object: element
+        )
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func tapAdjustment(on element: XCUIElement, increment: Bool) {
+        XCTAssertTrue(element.exists)
+        let x: CGFloat = increment ? 0.86 : 0.14
+        element.coordinate(withNormalizedOffset: CGVector(dx: x, dy: 0.72)).tap()
     }
 
     private func assertHorizontallyContained(
