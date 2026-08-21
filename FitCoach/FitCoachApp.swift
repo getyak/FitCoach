@@ -5,7 +5,6 @@ import SwiftData
 struct FitCoachApp: App {
     var body: some Scene {
         WindowGroup {
-            #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-uiTestAX5") {
                 RootView()
                     .dynamicTypeSize(.accessibility5)
@@ -14,10 +13,6 @@ struct FitCoachApp: App {
                 RootView()
                     .environmentObject(LocalizationManager.shared)
             }
-            #else
-            RootView()
-                .environmentObject(LocalizationManager.shared)
-            #endif
         }
         .modelContainer(for: [
             Student.self,
