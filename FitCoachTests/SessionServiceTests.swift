@@ -73,6 +73,36 @@ final class SessionServiceTests: XCTestCase {
         XCTAssertNil(set.rpe)
     }
 
+    func testFileBackedDraftSaveP95StaysInsideOneFrameBudget() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("FitCoach-save-latency-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let container = try makeFileContainer(at: directory.appendingPathComponent("FitCoach.store"))
+        let context = container.mainContext
+        let student = makeStudent(in: context)
+        let session = makeSession(for: student, in: context, completed: false)
+        let set = try XCTUnwrap(session.sortedExercises.first?.sortedSets.first)
+        try context.save()
+
+        var samples: [TimeInterval] = []
+        samples.reserveCapacity(120)
+        for index in 0..<120 {
+            set.notes = "快速记录 \(index)"
+            let startedAt = ProcessInfo.processInfo.systemUptime
+            try context.save()
+            samples.append(ProcessInfo.processInfo.systemUptime - startedAt)
+        }
+
+        let sorted = samples.sorted()
+        let p95 = sorted[Int(Double(sorted.count - 1) * 0.95)]
+        let maximum = try XCTUnwrap(sorted.last)
+        print("DRAFT_SAVE_LATENCY p95_ms=\(p95 * 1_000) max_ms=\(maximum * 1_000)")
+        XCTAssertLessThan(p95, 1.0 / 60.0, "P95 draft save should fit inside one 60 Hz frame")
+        XCTAssertLessThan(maximum, 0.05, "No individual draft save should create a visible 50 ms hitch")
+    }
+
     func testReopenRefundsOnceAndRecompleteKeepsNetSingleDebit() throws {
         let container = try makeContainer()
         let context = container.mainContext
