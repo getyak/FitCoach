@@ -13,7 +13,6 @@ struct ActiveWorkoutView: View {
     @State private var showingFinishConfirmation = false
     @State private var errorMessage: String?
     @State private var hapticTrigger = 0
-    @State private var pendingTextSave: Task<Void, Never>?
 
     init(session: WorkoutSession) {
         self.session = session
@@ -65,7 +64,7 @@ struct ActiveWorkoutView: View {
                                         onSetToggle: toggleSet,
                                         onValueChange: saveDraft,
                                         onValueCommit: saveDraft,
-                                        onTextChange: saveDraftDebounced
+                                        onTextChange: saveDraft
                                     )
                                     .id(currentExercise.id)
                                     .transition(.opacity.combined(with: .move(edge: .trailing)))
@@ -119,6 +118,7 @@ struct ActiveWorkoutView: View {
                         )
                         .padding(.horizontal, 12)
                         .padding(.bottom, 4)
+                        .background(AppTheme.canvas)
                     }
                 }
             }
@@ -128,7 +128,6 @@ struct ActiveWorkoutView: View {
             await RestActivityService.reconcile(sessionID: session.id, restEndsAt: session.restEndsAt)
         }
         .onDisappear {
-            pendingTextSave?.cancel()
             if modelContext.hasChanges { saveDraft() }
         }
         .confirmationDialog(
@@ -241,16 +240,6 @@ struct ActiveWorkoutView: View {
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
-        }
-    }
-
-    private func saveDraftDebounced() {
-        session.updatedAt = Date()
-        pendingTextSave?.cancel()
-        pendingTextSave = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(600))
-            guard !Task.isCancelled else { return }
-            saveDraft()
         }
     }
 
@@ -652,14 +641,14 @@ private struct WorkoutSetRow: View {
 
     private func changeWeight(by amount: Double) {
         let current = set.actualWeightKg ?? set.plannedWeightKg ?? 0
-        set.actualWeightKg = max(0, current + amount)
+        set.actualWeightKg = min(2_000, max(0, current + amount))
         valueHapticTrigger += 1
         onValueChange()
     }
 
     private func changeReps(by amount: Int) {
         let current = set.actualReps ?? set.plannedReps ?? 0
-        set.actualReps = max(0, current + amount)
+        set.actualReps = min(10_000, max(0, current + amount))
         valueHapticTrigger += 1
         onValueChange()
     }
@@ -722,11 +711,31 @@ private enum WorkoutMetric: String, Identifiable {
 
     var allowsDecimal: Bool { self != .reps }
 
+    var validRange: ClosedRange<Double> {
+        switch self {
+        case .weight: 0...2_000
+        case .reps: 0...10_000
+        case .rpe: 1...10
+        }
+    }
+
+    var rangeDescription: String {
+        switch self {
+        case .weight: "请输入 0–2000 kg"
+        case .reps: "请输入 0–10000 次"
+        case .rpe: "请输入 1–10"
+        }
+    }
+
+    func accepts(_ value: Double) -> Bool {
+        value.isFinite && validRange.contains(value)
+    }
+
     func normalized(_ value: Double) -> Double {
         switch self {
-        case .weight: max(0, value)
-        case .reps: max(0, value.rounded())
-        case .rpe: min(10, max(1, value))
+        case .weight: value
+        case .reps: value.rounded()
+        case .rpe: value
         }
     }
 }
@@ -742,11 +751,15 @@ private struct NumericValueEditor: View {
     init(metric: WorkoutMetric, initialValue: Double?, onCommit: @escaping (Double) -> Void) {
         self.metric = metric
         self.onCommit = onCommit
-        _text = State(initialValue: initialValue.map { $0.formatted() } ?? "")
+        _text = State(initialValue: initialValue.map {
+            $0.formatted(.number.grouping(.never))
+        } ?? "")
     }
 
     private var parsedValue: Double? {
-        Double(text.replacingOccurrences(of: ",", with: "."))
+        guard let value = Double(text.replacingOccurrences(of: ",", with: ".")),
+              metric.accepts(value) else { return nil }
+        return value
     }
 
     var body: some View {
@@ -781,6 +794,13 @@ private struct NumericValueEditor: View {
                     }
                 }
                 .padding(.horizontal, 24)
+
+                if !text.isEmpty, parsedValue == nil {
+                    Label(metric.rangeDescription, systemImage: "exclamationmark.circle")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("workout.directInput.error")
+                }
 
                 Button {
                     guard let parsedValue else { return }

@@ -127,7 +127,6 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertTrue(note.exists)
         note.tap()
         note.typeText("膝盖稳定")
-        Thread.sleep(forTimeInterval: 1)
 
         app.terminate()
         app.launchArguments = ["-uiTesting"]
@@ -188,6 +187,10 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 3))
         let clear = app.buttons["workout.directInput.clear"]
         XCTAssertTrue(clear.isHittable)
+        clear.tap()
+        field.typeText("999999999999999999999999")
+        XCTAssertTrue(app.staticTexts["workout.directInput.error"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.buttons["workout.directInput.save"].isEnabled)
         clear.tap()
         field.typeText("37.5")
 
