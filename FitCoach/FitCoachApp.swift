@@ -5,8 +5,19 @@ import SwiftData
 struct FitCoachApp: App {
     var body: some Scene {
         WindowGroup {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-uiTestAX5") {
+                RootView()
+                    .dynamicTypeSize(.accessibility5)
+                    .environmentObject(LocalizationManager.shared)
+            } else {
+                RootView()
+                    .environmentObject(LocalizationManager.shared)
+            }
+            #else
             RootView()
                 .environmentObject(LocalizationManager.shared)
+            #endif
         }
         .modelContainer(for: [
             Student.self,
@@ -16,7 +27,8 @@ struct FitCoachApp: App {
             BodyMeasurement.self,
             CreditTransaction.self,
             WorkoutTemplate.self,
-            TemplateExercise.self
+            TemplateExercise.self,
+            MigrationMarker.self
         ])
     }
 }

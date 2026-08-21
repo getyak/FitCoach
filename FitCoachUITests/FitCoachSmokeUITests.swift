@@ -84,12 +84,47 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["workout.restTimer"].exists)
     }
 
+    func testAllSetFieldsSurviveForcedRelaunch() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "-resetStore"]
+        app.launch()
+
+        let start = app.buttons["today.startWorkout"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+
+        let increaseWeight = app.buttons["增加重量"].firstMatch
+        let decreaseReps = app.buttons["减少次数"].firstMatch
+        let increaseRPE = app.buttons["增加RPE"].firstMatch
+        XCTAssertTrue(increaseWeight.waitForExistence(timeout: 5))
+        increaseWeight.tap()
+        decreaseReps.tap()
+        increaseRPE.tap()
+
+        let note = app.textFields["第 1 组备注"]
+        XCTAssertTrue(note.exists)
+        note.tap()
+        note.typeText("膝盖稳定")
+        Thread.sleep(forTimeInterval: 1)
+
+        app.terminate()
+        app.launchArguments = ["-uiTesting"]
+        app.launch()
+        let resume = app.buttons["today.startWorkout"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 5))
+        resume.tap()
+
+        XCTAssertTrue(app.staticTexts["重量 22.5"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["次数 9"].exists)
+        XCTAssertTrue(app.staticTexts["RPE 7.5"].exists)
+        XCTAssertEqual(app.textFields["第 1 组备注"].value as? String, "膝盖稳定")
+    }
+
     func testTodayPrimaryActionRemainsReachableAtAccessibilityTextSize() {
         let app = XCUIApplication()
-        app.launchArguments = [
-            "-uiTesting", "-resetStore",
-            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge"
-        ]
+        // Use an app-owned SwiftUI override. The old UIKit launch default silently
+        // falls back to normal text on iOS 26 and previously gave this test a false green.
+        app.launchArguments = ["-uiTesting", "-resetStore", "-uiTestAX5"]
         app.launch()
 
         let start = app.buttons["today.startWorkout"]

@@ -33,6 +33,8 @@ final class Student {
     var isOwner: Bool
     /// 学员购买的总课时数（比如买了20节课）。nil = 不追踪课时。
     var totalPurchasedSessions: Int?
+    /// 显式保存是否追踪课时。nil 仅用于兼容旧数据，并回退到旧字段推断。
+    var tracksCreditsFlag: Bool?
 
     /// 需要教练在训练开始前看到的风险或动作限制。
     var safetyNotes: String = ""
@@ -82,6 +84,7 @@ final class Student {
         self.createdDate = Date()
         self.isOwner = isOwner
         self.totalPurchasedSessions = totalPurchasedSessions
+        self.tracksCreditsFlag = totalPurchasedSessions != nil
     }
 
     var genderEnum: Gender {
@@ -103,9 +106,10 @@ final class Student {
         return total - consumed
     }
 
-    /// 旧数据用课时包是否存在表达追踪意图；有账本后则以账本为权威。
+    /// 旧数据在回填前仍可由课时包/账本推断；新数据始终保存明确意图。
     var tracksCredits: Bool {
-        totalPurchasedSessions != nil || !creditTransactions.isEmpty
+        get { tracksCreditsFlag ?? (totalPurchasedSessions != nil || !creditTransactions.isEmpty) }
+        set { tracksCreditsFlag = newValue }
     }
 
     var sortedMeasurements: [BodyMeasurement] {

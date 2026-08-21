@@ -32,14 +32,14 @@ xcodebuild \
   test CODE_SIGNING_ALLOWED=NO
 ```
 
-UI 测试使用 `-uiTesting -resetStore` 注入确定性场景，不影响正常用户数据。
+UI 测试使用 `-uiTesting -resetStore` 注入确定性场景，不影响正常用户数据；`-uiTestAX5` 仅在 Debug 构建中注入 SwiftUI AX5 字号，避免 iOS 26 旧 UIKit 字号参数造成假通过。
 
 ## 当前验证
 
-- 单元/集成：不追踪课时、续费流水、零完成组保护、课时只扣一次、撤销/重完成、复制上次、旧数据幂等回填、体测历史、V1/V2 备份恢复。
-- UI：启动、完整训练 9→8、强退后草稿/休息计时恢复、AX5 首页与训练控件布局断言。
+- 单元/集成：17/17，通过不追踪/暂停课时、续费流水、零完成组保护、课时只扣一次、撤销/重完成、复制上次、文件型数据库重开、旧数据幂等回填、体测历史、V1/V2 深合并与往返恢复。
+- UI：6/6，通过启动、完整训练 9→8、强退后草稿/休息计时恢复、重量/次数/RPE/备注强退恢复、AX5 首页与训练控件 frame 断言。
 - 视觉：iPhone SE、iPhone 17 Pro、iPhone 17 Pro Max；浅色与暗色。
-- 升级：在独立模拟器安装基线旧版并创建真实 SwiftData store，覆盖安装当前版本后成功启动；旧档案保留并生成初始体测历史。
+- 升级：在独立模拟器安装基线旧版并创建真实 SwiftData store，覆盖安装当前版本后成功启动；另有文件型 store 重开与回填 marker 测试。正式覆盖已有用户前，仍需补 exact V1 多学员/多课程 fixture 与 VersionedSchema 迁移计划的自动化证据。
 
 完整验收标准见 [docs/MVP_ACCEPTANCE.md](docs/MVP_ACCEPTANCE.md)。
 可交互产品设计见 [docs/FitCoach_MVP_Prototype.html](docs/FitCoach_MVP_Prototype.html)，可直接用浏览器打开。

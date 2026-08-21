@@ -19,6 +19,7 @@ struct EditStudentView: View {
     @State private var fitnessGoal: String
     @State private var notes: String
     @State private var totalPurchasedSessionsText: String
+    @State private var tracksCredits: Bool
     @State private var errorMessage: String?
 
     init(student: Student) {
@@ -33,6 +34,7 @@ struct EditStudentView: View {
         _fitnessGoal = State(initialValue: student.fitnessGoal)
         _notes = State(initialValue: student.notes)
         _totalPurchasedSessionsText = State(initialValue: student.totalPurchasedSessions.map { String($0) } ?? "")
+        _tracksCredits = State(initialValue: student.tracksCredits)
     }
 
     var body: some View {
@@ -109,22 +111,25 @@ struct EditStudentView: View {
 
                 if !student.isOwner {
                     Section {
-                        HStack {
-                            Text(loc.t("总课时数"))
-                            Spacer()
-                            TextField(loc.t("节（不追踪课时可留空）"), text: $totalPurchasedSessionsText)
-                                .keyboardType(.numberPad)
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 100)
+                        Toggle("追踪课时余额", isOn: $tracksCredits)
+                        if tracksCredits {
+                            HStack {
+                                Text(loc.t("总课时数"))
+                                Spacer()
+                                TextField(loc.t("节"), text: $totalPurchasedSessionsText)
+                                    .keyboardType(.numberPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 100)
+                            }
                         }
-                        if let remaining = student.remainingSessions {
+                        if tracksCredits, let remaining = student.remainingSessions {
                             LabeledContent(loc.t("剩余课时"), value: "\(remaining) 节")
                                 .foregroundStyle(.secondary)
                         }
                     } header: {
                         Text(loc.t("课时包"))
                     } footer: {
-                        Text("增加总课时会写入一笔续费流水；减少则记录为人工调整，余额不会被静默重算。")
+                        Text(tracksCredits ? "增加总课时会写入续费流水；减少则记录人工调整。" : "暂停追踪不会删除历史课时流水，重新开启后可继续核对。")
                     }
                 }
 
@@ -169,8 +174,9 @@ struct EditStudentView: View {
         student.waistCm = Double(waistCm)
         student.fitnessGoal = fitnessGoal
         student.notes = notes
+        student.tracksCredits = tracksCredits
         do {
-            if let newTotal = Int(totalPurchasedSessionsText) {
+            if tracksCredits, let newTotal = Int(totalPurchasedSessionsText) {
                 try SessionService(context: modelContext).adjustPurchasedCredits(for: student, newTotal: newTotal)
             } else {
                 try modelContext.save()

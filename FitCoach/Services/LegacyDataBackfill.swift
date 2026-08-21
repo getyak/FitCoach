@@ -4,10 +4,18 @@ import SwiftData
 /// 可重入的旧数据回填。每一步都以目标记录是否存在为判断，强退后再次运行不会重复。
 @MainActor
 enum LegacyDataBackfill {
+    private static let markerKey = "legacy-v3-backfill"
+
     static func run(in context: ModelContext) throws {
+        let markers = try context.fetch(FetchDescriptor<MigrationMarker>())
+        guard !markers.contains(where: { $0.key == markerKey }) else { return }
+
         let students = try context.fetch(FetchDescriptor<Student>())
 
         for student in students {
+            if student.tracksCreditsFlag == nil {
+                student.tracksCreditsFlag = student.totalPurchasedSessions != nil || !student.creditTransactions.isEmpty
+            }
             if student.measurements.isEmpty,
                student.weightKg > 0 || student.bodyFatPercentage != nil || student.waistCm != nil {
                 let measurement = BodyMeasurement(
@@ -81,6 +89,7 @@ enum LegacyDataBackfill {
             }
         }
 
-        if context.hasChanges { try context.save() }
+        context.insert(MigrationMarker(key: markerKey))
+        try context.save()
     }
 }

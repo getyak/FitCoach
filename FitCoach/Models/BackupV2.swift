@@ -34,6 +34,7 @@ struct StudentBackupV2: Codable {
     var createdDate: Date
     var isOwner: Bool
     var totalPurchasedSessions: Int?
+    var tracksCredits: Bool?
     var sessions: [SessionBackupV2]
     var measurements: [MeasurementBackupV2]
     var credits: [CreditBackupV2]
@@ -56,6 +57,7 @@ struct StudentBackupV2: Codable {
         createdDate = student.createdDate
         isOwner = student.isOwner
         totalPurchasedSessions = student.totalPurchasedSessions
+        tracksCredits = student.tracksCredits
         sessions = student.workoutSessions.map(SessionBackupV2.init)
         measurements = student.measurements.map(MeasurementBackupV2.init)
         credits = student.creditTransactions.map(CreditBackupV2.init)
@@ -312,6 +314,9 @@ enum BackupV2Service {
                 )
                 student.id = backup.id
                 student.createdDate = backup.createdDate
+                if let tracksCredits = backup.tracksCredits {
+                    student.tracksCredits = tracksCredits
+                }
                 context.insert(student)
                 studentsByID[student.id] = student
                 imported += 1

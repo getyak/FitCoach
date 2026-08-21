@@ -12,10 +12,15 @@ enum RestNotificationService {
         }
     }
 
-    static func schedule(for sessionID: UUID, exerciseName: String, endDate: Date) async {
-        guard UserDefaults.standard.bool(forKey: enabledKey) else { return }
+    static func isAuthorized() async -> Bool {
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        return status == .authorized || status == .provisional || status == .ephemeral
+    }
+
+    static func schedule(for sessionID: UUID, exerciseName: String, endDate: Date) async -> Bool {
+        guard UserDefaults.standard.bool(forKey: enabledKey) else { return true }
         let seconds = endDate.timeIntervalSinceNow
-        guard seconds > 1 else { return }
+        guard seconds > 1 else { return true }
 
         let content = UNMutableNotificationContent()
         content.title = "休息结束"
@@ -27,7 +32,12 @@ enum RestNotificationService {
             content: content,
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
         )
-        try? await UNUserNotificationCenter.current().add(request)
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            return true
+        } catch {
+            return false
+        }
     }
 
     static func cancel(for sessionID: UUID) {

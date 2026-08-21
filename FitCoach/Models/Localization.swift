@@ -85,6 +85,7 @@ private let translations: [String: [AppLanguage: String]] = [
     "训练记录": [.zh: "训练记录", .en: "Sessions", .es: "Sesiones"],
     "还没有训练记录": [.zh: "还没有训练记录", .en: "No sessions yet", .es: "Aún no hay sesiones"],
     "新增训练计划": [.zh: "新增训练计划", .en: "New Session", .es: "Nueva Sesión"],
+    "开始首次训练": [.zh: "开始首次训练", .en: "Start First Session", .es: "Iniciar Primera Sesión"],
     "经验": [.zh: "经验", .en: "Level", .es: "Nivel"],
 
     // Add session
@@ -95,6 +96,7 @@ private let translations: [String: [AppLanguage: String]] = [
     "还没有添加动作": [.zh: "还没有添加动作", .en: "No exercises added yet", .es: "Aún no hay ejercicios añadidos"],
     "添加动作": [.zh: "添加动作", .en: "Add Exercise", .es: "Añadir Ejercicio"],
     "保存计划": [.zh: "保存计划", .en: "Save Plan", .es: "Guardar Plan"],
+    "开始训练": [.zh: "开始训练", .en: "Start Session", .es: "Iniciar Sesión"],
     "动作名称，例如：杠铃深蹲": [
         .zh: "动作名称，例如：杠铃深蹲",
         .en: "Exercise name, e.g. Barbell Squat",

@@ -15,6 +15,7 @@ final class SessionServiceTests: XCTestCase {
             CreditTransaction.self,
             WorkoutTemplate.self,
             TemplateExercise.self,
+            MigrationMarker.self,
             configurations: configuration
         )
     }
@@ -118,6 +119,27 @@ final class SessionServiceTests: XCTestCase {
         XCTAssertTrue(student.creditTransactions.isEmpty)
     }
 
+    func testPausingCreditTrackingPreservesLedgerAndPreventsNewDebit() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let student = makeStudent(in: context)
+        let service = SessionService(context: context)
+        try service.createOpeningBalance(for: student, amount: 10)
+        let existingBalance = student.creditTransactions.reduce(0) { $0 + $1.amount }
+        student.tracksCredits = false
+        try context.save()
+
+        try service.complete(makeSession(for: student, in: context))
+
+        XCTAssertNil(student.remainingSessions)
+        XCTAssertEqual(student.creditTransactions.reduce(0) { $0 + $1.amount }, existingBalance)
+        XCTAssertEqual(student.creditTransactions.filter { $0.kind == .consume }.count, 0)
+
+        student.tracksCredits = true
+        try context.save()
+        XCTAssertEqual(student.remainingSessions, 10)
+    }
+
     func testRenewalCreatesLedgerTransactionAndChangesBalance() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -195,6 +217,52 @@ final class SessionServiceTests: XCTestCase {
         XCTAssertEqual(student.creditTransactions.filter { $0.kind == .openingBalance }.count, 1)
         XCTAssertEqual(student.creditTransactions.filter { $0.kind == .consume }.count, 1)
         XCTAssertEqual(student.remainingSessions, 9)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 1)
+    }
+
+    func testFileBackedStoreReopensWithoutRepeatingBackfill() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("FitCoach-reopen-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = directory.appendingPathComponent("FitCoach.store")
+        var expectedStudentID: UUID?
+
+        do {
+            let container = try makeFileContainer(at: storeURL)
+            let context = container.mainContext
+            let student = makeStudent(in: context)
+            expectedStudentID = student.id
+            let session = WorkoutSession(title: "旧训练", status: .planned)
+            session.statusCode = nil
+            session.student = student
+            context.insert(session)
+            let exercise = ExerciseEntry(name: "深蹲", category: .strength, plannedSets: 2, plannedReps: 8, plannedDurationMinutes: 10)
+            exercise.actualSets = 1
+            exercise.actualReps = 8
+            exercise.isCompleted = true
+            exercise.session = session
+            context.insert(exercise)
+            try context.save()
+            try LegacyDataBackfill.run(in: context)
+
+            XCTAssertEqual(exercise.sets.count, 2)
+            XCTAssertEqual(student.creditTransactions.count, 2)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 1)
+        }
+
+        do {
+            let container = try makeFileContainer(at: storeURL)
+            let context = container.mainContext
+            try LegacyDataBackfill.run(in: context)
+
+            let students = try context.fetch(FetchDescriptor<Student>())
+            XCTAssertEqual(students.count, 1)
+            XCTAssertEqual(students.first?.id, expectedStudentID)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<WorkoutSet>()), 2)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<CreditTransaction>()), 2)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 1)
+        }
     }
 
     private func makeStudent(in context: ModelContext) -> Student {
@@ -209,6 +277,21 @@ final class SessionServiceTests: XCTestCase {
         )
         context.insert(student)
         return student
+    }
+
+    private func makeFileContainer(at url: URL) throws -> ModelContainer {
+        try ModelContainer(
+            for: Student.self,
+            WorkoutSession.self,
+            ExerciseEntry.self,
+            WorkoutSet.self,
+            BodyMeasurement.self,
+            CreditTransaction.self,
+            WorkoutTemplate.self,
+            TemplateExercise.self,
+            MigrationMarker.self,
+            configurations: ModelConfiguration(url: url)
+        )
     }
 
     private func makeSession(for student: Student, in context: ModelContext, completed: Bool = true) -> WorkoutSession {

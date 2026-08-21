@@ -2,6 +2,17 @@ import Foundation
 import SwiftData
 
 @Model
+final class MigrationMarker {
+    var key: String
+    var completedAt: Date
+
+    init(key: String, completedAt: Date = Date()) {
+        self.key = key
+        self.completedAt = completedAt
+    }
+}
+
+@Model
 final class WorkoutSet {
     @Attribute(.unique) var id: UUID
     var sortIndex: Int

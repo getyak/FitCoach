@@ -35,6 +35,13 @@ struct TodayView: View {
             .max { $0.date < $1.date }
     }
 
+    private var focusedDraft: WorkoutSession? {
+        guard let focusStudent else { return nil }
+        return focusStudent.workoutSessions
+            .filter { $0.status == .inProgress || $0.status == .planned }
+            .max { ($0.startedAt ?? $0.date) < ($1.startedAt ?? $1.date) }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppTheme.sectionSpacing) {
@@ -62,7 +69,7 @@ struct TodayView: View {
                     FocusClientCard(
                         student: student,
                         previousSession: lastCompletedSession,
-                        activeSession: inProgressSession,
+                        activeSession: focusedDraft,
                         onStart: { startTraining(for: student) },
                         onViewTrend: { }
                     )
@@ -116,8 +123,17 @@ struct TodayView: View {
     }
 
     private func startTraining(for student: Student) {
-        if let inProgressSession {
-            activeSession = inProgressSession
+        if let draft = student.workoutSessions
+            .filter({ $0.status == .inProgress || $0.status == .planned })
+            .max(by: { ($0.startedAt ?? $0.date) < ($1.startedAt ?? $1.date) }) {
+            do {
+                if draft.status == .planned {
+                    try SessionService(context: modelContext).start(draft)
+                }
+                activeSession = draft
+            } catch {
+                errorMessage = error.localizedDescription
+            }
             return
         }
         guard let lastCompletedSession else {

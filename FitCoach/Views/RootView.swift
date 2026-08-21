@@ -9,14 +9,14 @@ struct RootView: View {
     var body: some View {
         AppShellView()
             .task {
-                if !ProcessInfo.processInfo.arguments.contains("-uiTesting") {
-                    do {
+                do {
+                    if !ProcessInfo.processInfo.arguments.contains("-uiTesting") {
                         try LegacyDataBackfill.run(in: modelContext)
-                    } catch {
-                        migrationError = "旧数据升级失败：\(error.localizedDescription)"
                     }
+                    try DemoDataSeeder.prepareIfNeeded(in: modelContext)
+                } catch {
+                    migrationError = "数据准备失败：\(error.localizedDescription)"
                 }
-                DemoDataSeeder.prepareIfNeeded(in: modelContext)
             }
             .alert("数据升级未完成", isPresented: Binding(
                 get: { migrationError != nil },

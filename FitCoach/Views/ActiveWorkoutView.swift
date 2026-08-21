@@ -159,11 +159,14 @@ struct ActiveWorkoutView: View {
                 hapticTrigger += 1
                 if let restEndsAt = session.restEndsAt {
                     Task {
-                        await RestNotificationService.schedule(
+                        let scheduled = await RestNotificationService.schedule(
                             for: session.id,
                             exerciseName: set.exercise?.name ?? "训练",
                             endDate: restEndsAt
                         )
+                        if !scheduled {
+                            errorMessage = "休息提醒安排失败；计时仍会在 App 内继续。"
+                        }
                     }
                 }
             }

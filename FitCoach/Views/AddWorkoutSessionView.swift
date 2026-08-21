@@ -45,14 +45,14 @@ struct AddWorkoutSessionView: View {
                     }
                 }
             }
-            .navigationTitle(loc.t("新增训练计划"))
+            .navigationTitle(loc.t(startImmediately ? "开始首次训练" : "新增训练计划"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(loc.t("取消")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(loc.t("保存计划")) { saveSession() }
+                    Button(loc.t(startImmediately ? "开始训练" : "保存计划")) { saveSession() }
                         .disabled(plannedExercises.isEmpty)
                 }
             }

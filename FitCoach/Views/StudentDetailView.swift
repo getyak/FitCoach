@@ -14,7 +14,10 @@ struct StudentDetailView: View {
     private var sortedSessions: [WorkoutSession] {
         student.workoutSessions.sorted { $0.date > $1.date }
     }
-    private var activeDraft: WorkoutSession? { sortedSessions.first { $0.status == .inProgress } }
+    private var activeDraft: WorkoutSession? {
+        sortedSessions.first { $0.status == .inProgress }
+            ?? sortedSessions.first { $0.status == .planned }
+    }
     private var lastCompleted: WorkoutSession? { sortedSessions.first { $0.status == .completed } }
 
     var body: some View {
@@ -148,7 +151,8 @@ struct StudentDetailView: View {
     }
 
     private var primaryActionTitle: String {
-        if activeDraft != nil { return "继续本节训练" }
+        if activeDraft?.status == .inProgress { return "继续本节训练" }
+        if activeDraft?.status == .planned { return "开始已保存计划" }
         if lastCompleted != nil { return "沿用上次并开始" }
         return "创建第一节训练"
     }
@@ -164,7 +168,14 @@ struct StudentDetailView: View {
 
     private func beginWorkout() {
         if let activeDraft {
-            activeSession = activeDraft
+            do {
+                if activeDraft.status == .planned {
+                    try SessionService(context: modelContext).start(activeDraft)
+                }
+                activeSession = activeDraft
+            } catch {
+                errorMessage = error.localizedDescription
+            }
             return
         }
         guard let lastCompleted else {

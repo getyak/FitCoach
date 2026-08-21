@@ -182,6 +182,26 @@ final class BackupV2Tests: XCTestCase {
         XCTAssertEqual(localExercise.sortedSets.last?.actualWeightKg, 62.5)
     }
 
+    func testRoundTripPreservesPausedCreditTrackingIntent() throws {
+        let sourceContainer = try makeContainer()
+        let source = sourceContainer.mainContext
+        let student = Student(name: "暂停课时", gender: .other, age: 35, fitnessLevel: .intermediate, weightKg: 72, heightCm: 176, totalPurchasedSessions: 8)
+        source.insert(student)
+        try SessionService(context: source).createOpeningBalance(for: student, amount: 8)
+        student.tracksCredits = false
+        try source.save()
+
+        let archive = try BackupV2Service.decode(BackupV2Service.encode(students: [student], templates: []))
+        let destinationContainer = try makeContainer()
+        let destination = destinationContainer.mainContext
+        _ = try BackupV2Service.insert(archive, into: destination)
+        let imported = try XCTUnwrap(try destination.fetch(FetchDescriptor<Student>()).first)
+
+        XCTAssertFalse(imported.tracksCredits)
+        XCTAssertNil(imported.remainingSessions)
+        XCTAssertEqual(imported.creditTransactions.reduce(0) { $0 + $1.amount }, 8)
+    }
+
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(
             for: Student.self,
@@ -192,6 +212,7 @@ final class BackupV2Tests: XCTestCase {
             CreditTransaction.self,
             WorkoutTemplate.self,
             TemplateExercise.self,
+            MigrationMarker.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
     }

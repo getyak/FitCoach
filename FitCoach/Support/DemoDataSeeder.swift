@@ -3,37 +3,37 @@ import SwiftData
 
 @MainActor
 enum DemoDataSeeder {
-    static func prepareIfNeeded(in context: ModelContext) {
+    static func prepareIfNeeded(in context: ModelContext) throws {
         let arguments = ProcessInfo.processInfo.arguments
         guard arguments.contains("-uiTesting") else { return }
 
         if arguments.contains("-resetStore") {
-            reset(context)
+            try reset(context)
         }
 
-        let students = (try? context.fetch(FetchDescriptor<Student>())) ?? []
+        let students = try context.fetch(FetchDescriptor<Student>())
         guard students.isEmpty else { return }
-        seedTodayScenario(in: context)
+        try seedTodayScenario(in: context)
     }
 
-    private static func reset(_ context: ModelContext) {
-        deleteAll(CreditTransaction.self, in: context)
-        deleteAll(WorkoutSet.self, in: context)
-        deleteAll(TemplateExercise.self, in: context)
-        deleteAll(ExerciseEntry.self, in: context)
-        deleteAll(WorkoutSession.self, in: context)
-        deleteAll(BodyMeasurement.self, in: context)
-        deleteAll(WorkoutTemplate.self, in: context)
-        deleteAll(Student.self, in: context)
-        try? context.save()
+    private static func reset(_ context: ModelContext) throws {
+        try deleteAll(CreditTransaction.self, in: context)
+        try deleteAll(WorkoutSet.self, in: context)
+        try deleteAll(TemplateExercise.self, in: context)
+        try deleteAll(ExerciseEntry.self, in: context)
+        try deleteAll(WorkoutSession.self, in: context)
+        try deleteAll(BodyMeasurement.self, in: context)
+        try deleteAll(WorkoutTemplate.self, in: context)
+        try deleteAll(Student.self, in: context)
+        try context.save()
     }
 
-    private static func deleteAll<T: PersistentModel>(_ type: T.Type, in context: ModelContext) {
-        guard let objects = try? context.fetch(FetchDescriptor<T>()) else { return }
+    private static func deleteAll<T: PersistentModel>(_ type: T.Type, in context: ModelContext) throws {
+        let objects = try context.fetch(FetchDescriptor<T>())
         objects.forEach(context.delete)
     }
 
-    private static func seedTodayScenario(in context: ModelContext) {
+    private static func seedTodayScenario(in context: ModelContext) throws {
         let calendar = Calendar(identifier: .gregorian)
         let now = Date()
         let student = Student(
@@ -133,7 +133,7 @@ enum DemoDataSeeder {
             context.insert(measurement)
         }
 
-        try? context.save()
+        try context.save()
     }
 
     private static func addExercise(

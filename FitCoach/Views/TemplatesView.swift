@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct TemplatesView: View {
     @Query(sort: \WorkoutTemplate.updatedAt, order: .reverse) private var templates: [WorkoutTemplate]
@@ -191,6 +192,7 @@ private struct TemplateStartView: View {
 struct ProfileView: View {
     @AppStorage(RestNotificationService.enabledKey) private var restNotificationsEnabled = false
     @State private var notificationMessage: String?
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         List {
@@ -225,10 +227,23 @@ struct ProfileView: View {
             Section { LabeledContent("版本", value: "1.0 MVP") }
         }
         .navigationTitle("我的")
+        .task {
+            guard restNotificationsEnabled else { return }
+            if !(await RestNotificationService.isAuthorized()) {
+                restNotificationsEnabled = false
+                notificationMessage = "系统通知权限已关闭。训练计时仍可使用；需要后台提醒时可前往设置开启。"
+            }
+        }
         .alert("无法开启提醒", isPresented: Binding(
             get: { notificationMessage != nil },
             set: { if !$0 { notificationMessage = nil } }
         )) {
+            Button("前往设置") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    openURL(url)
+                }
+                notificationMessage = nil
+            }
             Button("好", role: .cancel) { notificationMessage = nil }
         } message: {
             Text(notificationMessage ?? "请稍后重试")
