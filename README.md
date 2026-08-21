@@ -42,3 +42,4 @@ UI 测试使用 `-uiTesting -resetStore` 注入确定性场景，不影响正常
 - 升级：在独立模拟器安装基线旧版并创建真实 SwiftData store，覆盖安装当前版本后成功启动；旧档案保留并生成初始体测历史。
 
 完整验收标准见 [docs/MVP_ACCEPTANCE.md](docs/MVP_ACCEPTANCE.md)。
+可交互产品设计见 [docs/FitCoach_MVP_Prototype.html](docs/FitCoach_MVP_Prototype.html)，可直接用浏览器打开。
