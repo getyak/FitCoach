@@ -35,6 +35,7 @@
 		D118F40B614877B65EDF3AA8 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D147E83C60381FCF1968FCC6 /* RootView.swift */; };
 		E0B81EA2939E66173126C6B1 /* WorkoutSessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 394A42D7DC17BA8D0CA5BD35 /* WorkoutSessionDetailView.swift */; };
 		F113A685F6380F25DB1EAA0A /* ExerciseEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2E0E2B069D653E11B711F94 /* ExerciseEntry.swift */; };
+		F2C21027ED8E0592323FAC18 /* RestNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9258FE40F7748198229C79AD /* RestNotificationService.swift */; };
 		F4D7834334DAB487708F1E7A /* SessionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 954781C58DB0B28999A9C41E /* SessionServiceTests.swift */; };
 		FA9A2FB251E0708544D3E2EC /* Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D4B4C15D7903D4D2EB1879A /* Backup.swift */; };
 		FB22A188BB6655C79A3A4D02 /* LegacyDataBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01CED3F9B65EE864B80B9662 /* LegacyDataBackfill.swift */; };
@@ -80,6 +81,7 @@
 		84558A75B7F5569D5834EC1C /* Student.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Student.swift; sourceTree = "<group>"; };
 		8470225FA19D89C22644FB45 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		86CDE22294BD22F279E1F24A /* SessionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
+		9258FE40F7748198229C79AD /* RestNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestNotificationService.swift; sourceTree = "<group>"; };
 		93AF98198C341AEB0E7D2B0D /* DemoDataSeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoDataSeeder.swift; sourceTree = "<group>"; };
 		954781C58DB0B28999A9C41E /* SessionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionServiceTests.swift; sourceTree = "<group>"; };
 		A028AE5A7411E17636C43FB6 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
@@ -101,6 +103,7 @@
 			isa = PBXGroup;
 			children = (
 				01CED3F9B65EE864B80B9662 /* LegacyDataBackfill.swift */,
+				9258FE40F7748198229C79AD /* RestNotificationService.swift */,
 				86CDE22294BD22F279E1F24A /* SessionService.swift */,
 			);
 			path = Services;
@@ -353,6 +356,7 @@
 				01224D2762F7E34ABCD8F997 /* Localization.swift in Sources */,
 				459207BC5BE5ACB5E72B0D02 /* MeasurementTrendView.swift in Sources */,
 				6560E3B5E5481BF9606E10B2 /* OnboardingView.swift in Sources */,
+				F2C21027ED8E0592323FAC18 /* RestNotificationService.swift in Sources */,
 				D118F40B614877B65EDF3AA8 /* RootView.swift in Sources */,
 				8F8D757184207745E58EB5E1 /* SessionHistoryDetailView.swift in Sources */,
 				532E1669864DAC0D87922E52 /* SessionService.swift in Sources */,

@@ -189,11 +189,28 @@ private struct TemplateStartView: View {
 }
 
 struct ProfileView: View {
+    @AppStorage(RestNotificationService.enabledKey) private var restNotificationsEnabled = false
+    @State private var notificationMessage: String?
+
     var body: some View {
         List {
             Section("偏好") {
                 LabeledContent("语言", value: "简体中文")
                 Text("MVP 首发聚焦中文教练场景，其他语言将在完整适配后开放。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Toggle("休息结束提醒", isOn: $restNotificationsEnabled)
+                    .onChange(of: restNotificationsEnabled) { _, enabled in
+                        guard enabled else { return }
+                        Task {
+                            let granted = await RestNotificationService.requestAuthorization()
+                            if !granted {
+                                restNotificationsEnabled = false
+                                notificationMessage = "通知权限未开启，可稍后在系统设置中允许 FitCoach 通知。"
+                            }
+                        }
+                    }
+                Text("仅在你主动开启后，于组间休息结束时发送提醒。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -205,5 +222,13 @@ struct ProfileView: View {
             Section { LabeledContent("版本", value: "1.0 MVP") }
         }
         .navigationTitle("我的")
+        .alert("无法开启提醒", isPresented: Binding(
+            get: { notificationMessage != nil },
+            set: { if !$0 { notificationMessage = nil } }
+        )) {
+            Button("好", role: .cancel) { notificationMessage = nil }
+        } message: {
+            Text(notificationMessage ?? "请稍后重试")
+        }
     }
 }

@@ -7,6 +7,18 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
     }
 
+    func testWarmLaunchPerformance() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting"]
+        let options = XCTMeasureOptions()
+        options.iterationCount = 3
+
+        measure(metrics: [XCTApplicationLaunchMetric(waitUntilResponsive: true)], options: options) {
+            app.launch()
+            app.terminate()
+        }
+    }
+
     func testCoachCanContinuePreviousWorkoutAndConsumeOneCredit() {
         let app = XCUIApplication()
         app.launchArguments = ["-uiTesting", "-resetStore"]

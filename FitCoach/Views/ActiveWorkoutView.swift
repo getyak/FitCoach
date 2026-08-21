@@ -59,6 +59,7 @@ struct ActiveWorkoutView: View {
 
                             if let restEndsAt = session.restEndsAt {
                                 RestTimerCard(endDate: restEndsAt) {
+                                    RestNotificationService.cancel(for: session.id)
                                     session.restEndsAt = nil
                                     saveDraft()
                                 }
@@ -151,9 +152,19 @@ struct ActiveWorkoutView: View {
             let service = SessionService(context: modelContext)
             if set.isCompleted {
                 try service.undoSet(set, in: session)
+                RestNotificationService.cancel(for: session.id)
             } else {
                 try service.completeSet(set, in: session, restSeconds: restSeconds)
                 hapticTrigger += 1
+                if let restEndsAt = session.restEndsAt {
+                    Task {
+                        await RestNotificationService.schedule(
+                            for: session.id,
+                            exerciseName: set.exercise?.name ?? "训练",
+                            endDate: restEndsAt
+                        )
+                    }
+                }
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -178,6 +189,7 @@ struct ActiveWorkoutView: View {
     private func cancelSession() {
         do {
             try SessionService(context: modelContext).cancel(session)
+            RestNotificationService.cancel(for: session.id)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
@@ -219,6 +231,7 @@ struct ActiveWorkoutView: View {
     private func completeSession() {
         do {
             try SessionService(context: modelContext).complete(session)
+            RestNotificationService.cancel(for: session.id)
             hapticTrigger += 1
         } catch {
             errorMessage = error.localizedDescription
