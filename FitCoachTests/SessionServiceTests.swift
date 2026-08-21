@@ -4,6 +4,17 @@ import SwiftData
 
 @MainActor
 final class SessionServiceTests: XCTestCase {
+    func testSystemWorkoutRouteOnlyAcceptsWorkoutDeepLinks() {
+        let id = UUID(uuidString: "A1165A79-2B26-446E-AB9B-73D1495DB85E")!
+        XCTAssertEqual(
+            SystemWorkoutRoute.workoutID(from: URL(string: "fitcoach://workout/\(id.uuidString)")!),
+            id
+        )
+        XCTAssertNil(SystemWorkoutRoute.workoutID(from: URL(string: "fitcoach://profile/\(id.uuidString)")!))
+        XCTAssertNil(SystemWorkoutRoute.workoutID(from: URL(string: "https://workout/\(id.uuidString)")!))
+        XCTAssertNil(SystemWorkoutRoute.workoutID(from: URL(string: "fitcoach://workout/not-a-uuid")!))
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(

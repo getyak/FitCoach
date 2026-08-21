@@ -23,6 +23,14 @@ struct TodayView: View {
             .max { ($0.startedAt ?? $0.date) < ($1.startedAt ?? $1.date) }
     }
 
+    private var inProgressSessionIDs: [UUID] {
+        students
+            .flatMap(\.workoutSessions)
+            .filter { $0.status == .inProgress }
+            .map(\.id)
+            .sorted { $0.uuidString < $1.uuidString }
+    }
+
     private var focusStudent: Student? {
         students.first(where: { $0.id == selectedStudentID })
             ?? inProgressSession?.student
@@ -119,14 +127,10 @@ struct TodayView: View {
             }
         }
         .task(id: requestedWorkoutID) {
-            guard let requestedWorkoutID else { return }
-            defer { self.requestedWorkoutID = nil }
-            guard let session = students
-                .flatMap(\.workoutSessions)
-                .first(where: { $0.id == requestedWorkoutID && $0.status == .inProgress })
-            else { return }
-            selectedStudentID = session.student?.id
-            activeSession = session
+            openRequestedWorkoutIfAvailable()
+        }
+        .onChange(of: inProgressSessionIDs) {
+            openRequestedWorkoutIfAvailable()
         }
         .alert("暂时无法开始", isPresented: Binding(
             get: { errorMessage != nil },
@@ -162,6 +166,17 @@ struct TodayView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func openRequestedWorkoutIfAvailable() {
+        guard let requestedWorkoutID,
+              let session = students
+                .flatMap(\.workoutSessions)
+                .first(where: { $0.id == requestedWorkoutID && $0.status == .inProgress })
+        else { return }
+        selectedStudentID = session.student?.id
+        activeSession = session
+        self.requestedWorkoutID = nil
     }
 }
 

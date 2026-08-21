@@ -8,6 +8,15 @@ enum AppTab: Hashable {
     case profile
 }
 
+enum SystemWorkoutRoute {
+    static func workoutID(from url: URL) -> UUID? {
+        guard url.scheme == "fitcoach",
+              url.host == "workout",
+              let idText = url.pathComponents.dropFirst().first else { return nil }
+        return UUID(uuidString: idText)
+    }
+}
+
 struct AppShellView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: AppTab = .today
@@ -41,10 +50,7 @@ struct AppShellView: View {
         }
         .tint(AppTheme.brand)
         .onOpenURL { url in
-            guard url.scheme == "fitcoach",
-                  url.host == "workout",
-                  let idText = url.pathComponents.dropFirst().first,
-                  let id = UUID(uuidString: idText) else { return }
+            guard let id = SystemWorkoutRoute.workoutID(from: url) else { return }
             selectedTab = .today
             requestedWorkoutID = id
         }
