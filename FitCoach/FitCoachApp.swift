@@ -7,8 +7,16 @@ struct FitCoachApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(LocalizationManager.shared)
-                .fontDesign(.rounded)
         }
-        .modelContainer(for: [Student.self, WorkoutSession.self, ExerciseEntry.self])
+        .modelContainer(for: [
+            Student.self,
+            WorkoutSession.self,
+            ExerciseEntry.self,
+            WorkoutSet.self,
+            BodyMeasurement.self,
+            CreditTransaction.self,
+            WorkoutTemplate.self,
+            TemplateExercise.self
+        ])
     }
 }

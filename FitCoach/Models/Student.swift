@@ -15,6 +15,7 @@ enum FitnessLevel: String, Codable, CaseIterable, Hashable {
 
 @Model
 final class Student {
+    var id: UUID = UUID()
     var name: String
     var gender: String
     var age: Int
@@ -33,8 +34,20 @@ final class Student {
     /// 学员购买的总课时数（比如买了20节课）。nil = 不追踪课时。
     var totalPurchasedSessions: Int?
 
+    /// 需要教练在训练开始前看到的风险或动作限制。
+    var safetyNotes: String = ""
+
     @Relationship(deleteRule: .cascade, inverse: \WorkoutSession.student)
     var workoutSessions: [WorkoutSession] = []
+
+    @Relationship(deleteRule: .cascade, inverse: \BodyMeasurement.student)
+    var measurements: [BodyMeasurement] = []
+
+    @Relationship(deleteRule: .cascade, inverse: \WorkoutTemplate.student)
+    var workoutTemplates: [WorkoutTemplate] = []
+
+    @Relationship(deleteRule: .cascade, inverse: \CreditTransaction.student)
+    var creditTransactions: [CreditTransaction] = []
 
     init(
         name: String,
@@ -49,6 +62,7 @@ final class Student {
         waistCm: Double? = nil,
         fitnessGoal: String = "",
         notes: String = "",
+        safetyNotes: String = "",
         isOwner: Bool = false,
         totalPurchasedSessions: Int? = nil
     ) {
@@ -64,6 +78,7 @@ final class Student {
         self.waistCm = waistCm
         self.fitnessGoal = fitnessGoal
         self.notes = notes
+        self.safetyNotes = safetyNotes
         self.createdDate = Date()
         self.isOwner = isOwner
         self.totalPurchasedSessions = totalPurchasedSessions
@@ -79,7 +94,19 @@ final class Student {
 
     /// 剩余课时 = 总课时 - 已经记录过的训练次数。没设置总课时就返回 nil（不追踪）。
     var remainingSessions: Int? {
+        if !creditTransactions.isEmpty {
+            return creditTransactions.reduce(0) { $0 + $1.amount }
+        }
         guard let total = totalPurchasedSessions else { return nil }
-        return max(0, total - workoutSessions.count)
+        let consumed = workoutSessions.filter(\.countsTowardCredit).count
+        return total - consumed
+    }
+
+    var sortedMeasurements: [BodyMeasurement] {
+        measurements.sorted { $0.measuredAt < $1.measuredAt }
+    }
+
+    var latestMeasurement: BodyMeasurement? {
+        measurements.max { $0.measuredAt < $1.measuredAt }
     }
 }

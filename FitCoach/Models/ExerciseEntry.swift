@@ -39,8 +39,12 @@ enum CardioIntensity: String, Codable, CaseIterable, Hashable {
 
 @Model
 final class ExerciseEntry {
+    var id: UUID = UUID()
     var name: String
     var category: String
+    var sortIndex: Int = 0
+    var notes: String = ""
+    var targetRPE: Double?
     /// 只有当 category 是"有氧训练"时才有值：轻度/中度/高度
     var cardioIntensity: String?
 
@@ -59,10 +63,14 @@ final class ExerciseEntry {
 
     var session: WorkoutSession?
 
+    @Relationship(deleteRule: .cascade, inverse: \WorkoutSet.exercise)
+    var sets: [WorkoutSet] = []
+
     init(
         name: String,
         category: ExerciseCategory,
         cardioIntensity: CardioIntensity? = nil,
+        sortIndex: Int = 0,
         plannedSets: Int = 0,
         plannedReps: Int = 0,
         plannedRestSeconds: Int = 0,
@@ -71,6 +79,7 @@ final class ExerciseEntry {
         self.name = name
         self.category = category.rawValue
         self.cardioIntensity = cardioIntensity?.rawValue
+        self.sortIndex = sortIndex
         self.plannedSets = plannedSets
         self.plannedReps = plannedReps
         self.plannedRestSeconds = plannedRestSeconds
@@ -88,6 +97,19 @@ final class ExerciseEntry {
 
     var cardioIntensityEnum: CardioIntensity? {
         cardioIntensity.flatMap { CardioIntensity(rawValue: $0) }
+    }
+
+    var sortedSets: [WorkoutSet] {
+        sets.sorted { $0.sortIndex < $1.sortIndex }
+    }
+
+    var previousSummary: String {
+        guard let strongest = sets.max(by: { ($0.actualWeightKg ?? 0) < ($1.actualWeightKg ?? 0) }) else {
+            return "暂无逐组记录"
+        }
+        let weight = strongest.actualWeightKg ?? strongest.plannedWeightKg ?? 0
+        let reps = strongest.actualReps ?? strongest.plannedReps ?? 0
+        return "\(weight.formatted()) kg × \(reps)"
     }
 
     /// 根据实际完成的训练时长 + 动作强度(MET) + 学员体重 估算本动作消耗的卡路里
