@@ -95,6 +95,10 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertTrue(restoredSet.waitForExistence(timeout: 5))
         XCTAssertTrue(waitForLabelContaining("撤销第 1 组完成", on: restoredSet, timeout: 3))
         XCTAssertTrue(app.descendants(matching: .any)["workout.restTimer"].exists)
+        let skipRest = app.buttons["workout.skipRest"]
+        XCTAssertTrue(skipRest.isHittable)
+        skipRest.tap()
+        XCTAssertFalse(app.descendants(matching: .any)["workout.restTimer"].exists)
     }
 
     func testAllSetFieldsSurviveForcedRelaunch() {
@@ -214,6 +218,7 @@ final class FitCoachSmokeUITests: XCTestCase {
         attachment.name = "Today-and-workout-AX5"
         attachment.lifetime = .keepAlways
         add(attachment)
+        skipRest.tap()
     }
 
     private func waitForLabel(_ label: String, on element: XCUIElement, timeout: TimeInterval) -> Bool {

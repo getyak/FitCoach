@@ -3,6 +3,7 @@ import SwiftData
 
 struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
+    @Binding var requestedWorkoutID: UUID?
     @Query(
         filter: #Predicate<Student> { $0.isOwner == false },
         sort: \Student.createdDate,
@@ -116,6 +117,16 @@ struct TodayView: View {
             } else {
                 ActiveWorkoutView(session: session)
             }
+        }
+        .task(id: requestedWorkoutID) {
+            guard let requestedWorkoutID else { return }
+            defer { self.requestedWorkoutID = nil }
+            guard let session = students
+                .flatMap(\.workoutSessions)
+                .first(where: { $0.id == requestedWorkoutID && $0.status == .inProgress })
+            else { return }
+            selectedStudentID = session.student?.id
+            activeSession = session
         }
         .alert("暂时无法开始", isPresented: Binding(
             get: { errorMessage != nil },

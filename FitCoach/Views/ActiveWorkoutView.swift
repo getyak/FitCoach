@@ -137,6 +137,9 @@ struct ActiveWorkoutView: View {
             }
         }
         .sensoryFeedback(.success, trigger: hapticTrigger)
+        .task {
+            await RestActivityService.reconcile(sessionID: session.id, restEndsAt: session.restEndsAt)
+        }
         .onDisappear {
             pendingValueSave?.cancel()
             pendingTextSave?.cancel()
@@ -183,6 +186,7 @@ struct ActiveWorkoutView: View {
             if set.isCompleted {
                 try service.undoSet(set, in: session)
                 RestNotificationService.cancel(for: session.id)
+                Task { await RestActivityService.end(for: session.id) }
                 focus(on: set.id)
             } else {
                 try service.completeSet(set, in: session, restSeconds: restSeconds)
@@ -194,6 +198,7 @@ struct ActiveWorkoutView: View {
                 )
                 if let restEndsAt = session.restEndsAt {
                     Task {
+                        await RestActivityService.upsert(for: session.id, endDate: restEndsAt)
                         let scheduled = await RestNotificationService.schedule(
                             for: session.id,
                             exerciseName: set.exercise?.name ?? "训练",
@@ -227,6 +232,7 @@ struct ActiveWorkoutView: View {
 
     private func skipRest() {
         RestNotificationService.cancel(for: session.id)
+        Task { await RestActivityService.end(for: session.id) }
         session.restEndsAt = nil
         saveDraft()
     }
@@ -245,6 +251,7 @@ struct ActiveWorkoutView: View {
         do {
             try SessionService(context: modelContext).cancel(session)
             RestNotificationService.cancel(for: session.id)
+            Task { await RestActivityService.end(for: session.id) }
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
@@ -302,6 +309,7 @@ struct ActiveWorkoutView: View {
         do {
             try SessionService(context: modelContext).complete(session)
             RestNotificationService.cancel(for: session.id)
+            Task { await RestActivityService.end(for: session.id) }
             hapticTrigger += 1
         } catch {
             errorMessage = error.localizedDescription
