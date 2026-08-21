@@ -3,11 +3,15 @@ import Foundation
 
 @MainActor
 enum RestActivityService {
+    private static var generations: [UUID: Int] = [:]
+
     static func upsert(for sessionID: UUID, endDate: Date) async {
         guard endDate > Date() else {
             await end(for: sessionID)
             return
         }
+
+        let generation = beginOperation(for: sessionID)
 
         let sessionKey = sessionID.uuidString
         let content = ActivityContent(
@@ -19,10 +23,15 @@ enum RestActivityService {
             if activity.attributes.sessionID == sessionKey {
                 await activity.update(content)
             } else {
+                if let otherSessionID = UUID(uuidString: activity.attributes.sessionID) {
+                    _ = beginOperation(for: otherSessionID)
+                }
                 await end(activity)
             }
+            guard isCurrent(generation, for: sessionID) else { return }
         }
 
+        guard isCurrent(generation, for: sessionID) else { return }
         guard !Activity<RestActivityAttributes>.activities.contains(where: {
             $0.attributes.sessionID == sessionKey
         }) else { return }
@@ -36,6 +45,7 @@ enum RestActivityService {
     }
 
     static func end(for sessionID: UUID) async {
+        _ = beginOperation(for: sessionID)
         let sessionKey = sessionID.uuidString
         for activity in Activity<RestActivityAttributes>.activities
         where activity.attributes.sessionID == sessionKey {
@@ -46,6 +56,9 @@ enum RestActivityService {
     static func endExpiredActivities(now: Date = Date()) async {
         for activity in Activity<RestActivityAttributes>.activities
         where activity.content.state.endsAt <= now {
+            if let sessionID = UUID(uuidString: activity.attributes.sessionID) {
+                _ = beginOperation(for: sessionID)
+            }
             await end(activity)
         }
     }
@@ -64,5 +77,15 @@ enum RestActivityService {
             staleDate: nil
         )
         await activity.end(finalContent, dismissalPolicy: .immediate)
+    }
+
+    private static func beginOperation(for sessionID: UUID) -> Int {
+        let generation = (generations[sessionID] ?? 0) + 1
+        generations[sessionID] = generation
+        return generation
+    }
+
+    private static func isCurrent(_ generation: Int, for sessionID: UUID) -> Bool {
+        generations[sessionID] == generation
     }
 }

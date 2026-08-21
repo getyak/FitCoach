@@ -1,18 +1,20 @@
 import SwiftUI
 import SwiftData
-import UIKit
 
 struct ActiveWorkoutView: View {
     @Bindable var session: WorkoutSession
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var currentExerciseIndex: Int
     @State private var focusedSetID: UUID?
     @State private var showingFinishConfirmation = false
     @State private var errorMessage: String?
-    @State private var hapticTrigger = 0
+    @State private var setCompletionHapticTrigger = 0
+    @State private var setUndoHapticTrigger = 0
+    @State private var sessionCompletionHapticTrigger = 0
 
     init(session: WorkoutSession) {
         self.session = session
@@ -63,9 +65,9 @@ struct ActiveWorkoutView: View {
                                         isResting: session.restEndsAt != nil,
                                         onFocusSet: { focus(on: $0.id) },
                                         onSetToggle: toggleSet,
-                                        onValueChange: saveDraft,
-                                        onValueCommit: saveDraft,
-                                        onTextChange: saveDraft
+                                        onValueChange: { _ = saveDraft() },
+                                        onValueCommit: { _ = saveDraft() },
+                                        onTextChange: { _ = saveDraft() }
                                     )
                                     .id(currentExercise.id)
                                     .transition(.opacity.combined(with: .move(edge: .trailing)))
@@ -80,17 +82,17 @@ struct ActiveWorkoutView: View {
                         .task(id: currentExercise?.id) {
                             await Task.yield()
                             guard let focusedSetID else { return }
-                            proxy.scrollTo(focusedSetID, anchor: .center)
+                            proxy.scrollTo(focusedSetID, anchor: setScrollAnchor)
                         }
                         .onChange(of: focusedSetID) { _, target in
                             guard let target else { return }
                             Task { @MainActor in
                                 await Task.yield()
                                 if reduceMotion {
-                                    proxy.scrollTo(target, anchor: .center)
+                                    proxy.scrollTo(target, anchor: setScrollAnchor)
                                 } else {
                                     withAnimation(.snappy(duration: 0.24)) {
-                                        proxy.scrollTo(target, anchor: .center)
+                                        proxy.scrollTo(target, anchor: setScrollAnchor)
                                     }
                                 }
                             }
@@ -108,6 +110,7 @@ struct ActiveWorkoutView: View {
                     .safeAreaInset(edge: .bottom) {
                         WorkoutBottomControls(
                             currentSetNumber: currentActionSet.map { $0.sortIndex + 1 },
+                            completedSetNumber: restCompletedSetNumber,
                             restEndsAt: session.restEndsAt,
                             canGoPrevious: currentExerciseIndex > 0,
                             isLastExercise: currentExerciseIndex >= exercises.count - 1,
@@ -124,7 +127,9 @@ struct ActiveWorkoutView: View {
                 }
             }
         }
-        .sensoryFeedback(.success, trigger: hapticTrigger)
+        .sensoryFeedback(.impact(weight: .light), trigger: setCompletionHapticTrigger)
+        .sensoryFeedback(.warning, trigger: setUndoHapticTrigger)
+        .sensoryFeedback(.success, trigger: sessionCompletionHapticTrigger)
         .task {
             await RestActivityService.reconcile(sessionID: session.id, restEndsAt: session.restEndsAt)
         }
@@ -159,6 +164,18 @@ struct ActiveWorkoutView: View {
         return "完成并扣课（\(remaining) → \(remaining - 1) 节）"
     }
 
+    private var setScrollAnchor: UnitPoint {
+        dynamicTypeSize.isAccessibilitySize ? .top : .center
+    }
+
+    private var restCompletedSetNumber: Int? {
+        guard session.restEndsAt != nil else { return nil }
+        return currentExercise?.sortedSets
+            .filter(\.isCompleted)
+            .max(by: { $0.sortIndex < $1.sortIndex })
+            .map { $0.sortIndex + 1 }
+    }
+
     private var finishConfirmationMessage: String {
         if session.consumesCredit, let remaining = session.student?.remainingSessions, remaining <= 0 {
             return "当前课时不足。完成后会保留真实负余额，便于后续续费核对；不会把欠课隐藏为 0。"
@@ -171,17 +188,14 @@ struct ActiveWorkoutView: View {
             let service = SessionService(context: modelContext)
             if set.isCompleted {
                 try service.undoSet(set, in: session)
+                setUndoHapticTrigger += 1
                 RestNotificationService.cancel(for: session.id)
                 Task { await RestActivityService.end(for: session.id) }
                 focus(on: set.id)
             } else {
                 try service.completeSet(set, in: session, restSeconds: restSeconds)
-                hapticTrigger += 1
+                setCompletionHapticTrigger += 1
                 focus(on: currentExercise?.sortedSets.first(where: { !$0.isCompleted })?.id)
-                UIAccessibility.post(
-                    notification: .announcement,
-                    argument: "第 \(set.sortIndex + 1) 组完成，休息 \(restSeconds) 秒"
-                )
                 if let restEndsAt = session.restEndsAt {
                     Task {
                         await RestActivityService.upsert(for: session.id, endDate: restEndsAt)
@@ -217,19 +231,22 @@ struct ActiveWorkoutView: View {
     }
 
     private func skipRest() {
+        session.restEndsAt = nil
+        guard saveDraft() else { return }
         RestNotificationService.cancel(for: session.id)
         Task { await RestActivityService.end(for: session.id) }
-        session.restEndsAt = nil
-        saveDraft()
     }
 
-    private func saveDraft() {
+    @discardableResult
+    private func saveDraft() -> Bool {
         session.updatedAt = Date()
         do {
             try modelContext.save()
+            return true
         } catch {
             modelContext.rollback()
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -274,7 +291,7 @@ struct ActiveWorkoutView: View {
             try SessionService(context: modelContext).complete(session)
             RestNotificationService.cancel(for: session.id)
             Task { await RestActivityService.end(for: session.id) }
-            hapticTrigger += 1
+            sessionCompletionHapticTrigger += 1
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -664,6 +681,7 @@ private struct WorkoutSetRow: View {
     private var setNumber: some View {
         Text("第 \(set.sortIndex + 1) 组")
             .font(.headline)
+            .accessibilityIdentifier("workout.currentSetTitle")
     }
 
     @ViewBuilder private var valueControls: some View {
@@ -1012,6 +1030,7 @@ private struct UnsetMetricControl: View {
 private struct WorkoutBottomControls: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let currentSetNumber: Int?
+    let completedSetNumber: Int?
     let restEndsAt: Date?
     let canGoPrevious: Bool
     let isLastExercise: Bool
@@ -1024,7 +1043,11 @@ private struct WorkoutBottomControls: View {
     var body: some View {
         Group {
             if let restEndsAt {
-                CompactRestStatus(endDate: restEndsAt, onSkip: onSkipRest)
+                CompactRestStatus(
+                    completedSetNumber: completedSetNumber,
+                    endDate: restEndsAt,
+                    onSkip: onSkipRest
+                )
             } else {
                 HStack(spacing: 10) {
                     Group {
@@ -1090,6 +1113,10 @@ private struct WorkoutBottomControls: View {
 }
 
 private struct CompactRestStatus: View {
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+    @AccessibilityFocusState private var timerFocused: Bool
+    @State private var didFinish = false
+    let completedSetNumber: Int?
     let endDate: Date
     let onSkip: () -> Void
 
@@ -1106,17 +1133,40 @@ private struct CompactRestStatus: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(remaining > 0 ? Color.primary : AppTheme.success)
                 .accessibilityElement(children: .combine)
+                .accessibilityLabel(restAccessibilityLabel)
+                .accessibilityValue(remaining > 0 ? "剩余 \(remaining) 秒" : "休息完成")
+                .accessibilityFocused($timerFocused)
                 .accessibilityIdentifier("workout.restTimer")
 
                 Spacer(minLength: 8)
 
-                Button(remaining > 0 ? "跳过" : "收起", action: onSkip)
+                Button("跳过", action: onSkip)
                     .font(.subheadline.weight(.semibold))
                     .minimumTapTarget()
-                    .accessibilityLabel(remaining > 0 ? "跳过休息" : "收起休息状态")
+                    .accessibilityLabel("跳过休息")
                     .accessibilityIdentifier("workout.skipRest")
             }
             .sensoryFeedback(.success, trigger: remaining == 0)
+            .onChange(of: remaining) { _, newValue in
+                finishIfNeeded(remaining: newValue)
+            }
+            .task {
+                if voiceOverEnabled {
+                    await Task.yield()
+                    timerFocused = true
+                }
+                finishIfNeeded(remaining: remaining)
+            }
         }
+    }
+
+    private var restAccessibilityLabel: String {
+        completedSetNumber.map { "第 \($0) 组完成，休息计时" } ?? "休息计时"
+    }
+
+    private func finishIfNeeded(remaining: Int) {
+        guard remaining == 0, !didFinish else { return }
+        didFinish = true
+        onSkip()
     }
 }

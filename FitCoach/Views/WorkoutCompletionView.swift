@@ -26,7 +26,7 @@ struct WorkoutCompletionView: View {
                             .accessibilityHidden(true)
                         Text("本节训练完成")
                             .font(.largeTitle.bold())
-                        Text("已安全保存到 \(session.student?.name ?? "学员") 的训练记录")
+                        Text(completionSubtitle)
                             .foregroundStyle(.primary)
                     }
                     .padding(.top, dynamicTypeSize.isAccessibilitySize ? 8 : 20)
@@ -79,9 +79,19 @@ struct WorkoutCompletionView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 HStack {
                     Spacer()
-                    Button("返回今天", action: onDismiss)
-                        .font(.body.weight(.semibold))
+                    Button(action: onDismiss) {
+                        if dynamicTypeSize.isAccessibilitySize {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 44, height: 44)
+                        } else {
+                            Text("完成")
+                                .font(.body.weight(.semibold))
+                        }
+                    }
                         .minimumTapTarget()
+                        .accessibilityLabel("返回今天")
                         .accessibilityIdentifier("completion.done")
                 }
                 .padding(.horizontal, AppTheme.pagePadding)
@@ -122,6 +132,13 @@ struct WorkoutCompletionView: View {
     private var durationText: String {
         guard let startedAt = session.startedAt, let completedAt = session.completedAt else { return "—" }
         return "\(max(1, Int(completedAt.timeIntervalSince(startedAt) / 60))) 分"
+    }
+
+    private var completionSubtitle: String {
+        let name = session.student?.name ?? "学员"
+        return dynamicTypeSize.isAccessibilitySize
+            ? "已保存至 \(name)"
+            : "已安全保存到 \(name) 的训练记录"
     }
 
     private var remainingText: String {
@@ -176,6 +193,7 @@ struct WorkoutCompletionView: View {
         }
         .buttonStyle(SecondaryActionButtonStyle())
         .accessibilityLabel("查看体测趋势")
+        .accessibilityIdentifier("completion.trend")
     }
 
     private func reopenSession() {

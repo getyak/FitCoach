@@ -416,8 +416,10 @@ enum BackupV2Service {
     /// 导入采用 local-wins：保留本地已有字段，只补齐备份中缺失的动作和组。
     private static func mergeMissingExercises(_ items: [ExerciseBackupV2], into session: WorkoutSession, context: ModelContext) {
         var exercisesByID = Dictionary(uniqueKeysWithValues: session.exercises.map { ($0.id, $0) })
+        var insertedExerciseIDs = Set<UUID>()
         for item in items {
             guard let existing = exercisesByID[item.id] else {
+                guard insertedExerciseIDs.insert(item.id).inserted else { continue }
                 insertExercises([item], into: session, context: context)
                 continue
             }

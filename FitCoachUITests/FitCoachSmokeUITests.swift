@@ -46,6 +46,11 @@ final class FitCoachSmokeUITests: XCTestCase {
                     XCTAssertTrue(nextSet.isHittable)
                     XCTAssertTrue(app.descendants(matching: .any)["workout.control.重量"].isHittable)
                     XCTAssertFalse(app.buttons["workout.completeCurrentSet"].exists)
+                    XCTAssertTrue(waitForLabelContaining(
+                        "第 1 组完成",
+                        on: app.descendants(matching: .any)["workout.restTimer"],
+                        timeout: 2
+                    ))
                     let attachment = XCTAttachment(screenshot: app.screenshot())
                     attachment.name = "Progressive-current-set-and-rest"
                     attachment.lifetime = .keepAlways
@@ -73,11 +78,29 @@ final class FitCoachSmokeUITests: XCTestCase {
         let done = app.buttons["completion.done"]
         XCTAssertTrue(done.isHittable)
         assertHorizontallyContained(done, in: app)
+        XCTAssertLessThanOrEqual(done.frame.width, app.windows.firstMatch.frame.width * 0.35)
+        let completionTitle = app.staticTexts["本节训练完成"]
+        XCTAssertTrue(completionTitle.exists)
+        XCTAssertFalse(done.frame.intersects(completionTitle.frame))
         let completionAttachment = XCTAttachment(screenshot: app.screenshot())
         completionAttachment.name = "Workout-completion"
         completionAttachment.lifetime = .keepAlways
         add(completionAttachment)
         try auditAccessibility(in: app)
+
+        let summary = app.textViews["completion.summary"]
+        XCTAssertTrue(summary.exists)
+        XCTAssertTrue((summary.value as? String)?.contains("本次完成") == true)
+        let trend = app.buttons["completion.trend"]
+        XCTAssertTrue(trend.exists)
+        for _ in 0..<3 where !trend.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(trend.isHittable)
+        trend.tap()
+        XCTAssertTrue(app.buttons["measurement.add"].waitForExistence(timeout: 3))
+        app.buttons["完成"].tap()
+        XCTAssertTrue(done.waitForExistence(timeout: 3))
 
         let reopen = app.buttons["completion.reopen"]
         XCTAssertTrue(reopen.exists)
@@ -122,6 +145,24 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertTrue(skipRest.isHittable)
         skipRest.tap()
         XCTAssertFalse(app.descendants(matching: .any)["workout.restTimer"].exists)
+    }
+
+    func testRestAutomaticallyFinishesAndRestoresNextSet() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "-resetStore", "-seedShortRest"]
+        app.launch()
+
+        let resume = app.buttons["today.startWorkout"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 5))
+        resume.tap()
+
+        let restTimer = app.descendants(matching: .any)["workout.restTimer"]
+        XCTAssertTrue(restTimer.waitForExistence(timeout: 4))
+        XCTAssertTrue(waitForLabelContaining("第 1 组完成", on: restTimer, timeout: 2))
+        XCTAssertFalse(app.buttons["workout.completeCurrentSet"].exists)
+        XCTAssertTrue(restTimer.waitForNonExistence(timeout: 9))
+        XCTAssertTrue(app.buttons["workout.completeCurrentSet"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["workout.set.1.editor"].isHittable)
     }
 
     func testAllSetFieldsSurviveForcedRelaunch() {
@@ -335,6 +376,11 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertLessThan(weight.frame.midY, reps.frame.midY)
         XCTAssertLessThan(reps.frame.midY, rpe.frame.midY)
         XCTAssertTrue(app.buttons["workout.completeCurrentSet"].isHittable)
+        let header = app.buttons["workout.pause"]
+        let currentSetTitle = app.descendants(matching: .any)["workout.currentSetTitle"]
+        XCTAssertTrue(header.exists)
+        XCTAssertTrue(currentSetTitle.exists)
+        XCTAssertGreaterThanOrEqual(currentSetTitle.frame.minY, header.frame.maxY + 1)
         assertHorizontallyContained(app.descendants(matching: .any)["workout.elapsedTime"].firstMatch, in: app)
         assertHorizontallyContained(app.descendants(matching: .any)["workout.previousPerformance"].firstMatch, in: app)
         assertHorizontallyContained(app.buttons["workout.completeCurrentSet"], in: app)
@@ -344,7 +390,10 @@ final class FitCoachSmokeUITests: XCTestCase {
         let skipRest = app.buttons["workout.skipRest"]
         XCTAssertTrue(restTimer.waitForExistence(timeout: 2))
         XCTAssertTrue(skipRest.isHittable)
+        XCTAssertTrue(waitForLabelContaining("第 1 组完成", on: restTimer, timeout: 2))
         XCTAssertFalse(app.buttons["workout.completeCurrentSet"].exists)
+        let nextSetTitle = app.descendants(matching: .any)["workout.currentSetTitle"]
+        XCTAssertGreaterThanOrEqual(nextSetTitle.frame.minY, header.frame.maxY + 1)
         assertHorizontallyContained(restTimer, in: app)
         assertHorizontallyContained(skipRest, in: app)
         XCTAssertLessThan(restTimer.frame.union(skipRest.frame).height, app.windows.firstMatch.frame.height * 0.25)

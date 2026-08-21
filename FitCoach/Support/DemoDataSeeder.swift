@@ -17,6 +17,9 @@ enum DemoDataSeeder {
             in: context,
             includesDeepLinkSession: arguments.contains("-seedDeepLink")
         )
+        if arguments.contains("-seedShortRest") {
+            try seedShortRestScenario(in: context)
+        }
     }
 
     private static func reset(_ context: ModelContext) throws {
@@ -179,6 +182,17 @@ enum DemoDataSeeder {
         )
         set.exercise = exercise
         context.insert(set)
+    }
+
+    private static func seedShortRestScenario(in context: ModelContext) throws {
+        let student = try context.fetch(FetchDescriptor<Student>()).first
+        let source = student?.workoutSessions.first(where: { $0.status == .completed })
+        guard let student, let source else { return }
+
+        let session = try SessionService(context: context).startByCopying(source: source, for: student)
+        guard let firstExercise = session.sortedExercises.first,
+              let firstSet = firstExercise.sortedSets.first else { return }
+        try SessionService(context: context).completeSet(firstSet, in: session, restSeconds: 8)
     }
 
     private static func addExercise(

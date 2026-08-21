@@ -235,6 +235,40 @@ final class BackupV2Tests: XCTestCase {
         XCTAssertEqual(try destination.fetchCount(FetchDescriptor<WorkoutSet>()), 1)
     }
 
+    func testMalformedArchiveDuplicateExerciseIDDoesNotDuplicateDuringMerge() throws {
+        let sourceContainer = try makeContainer()
+        let source = sourceContainer.mainContext
+        let student = Student(name: "重复动作", gender: .other, age: 30, fitnessLevel: .intermediate, weightKg: 70, heightCm: 175)
+        source.insert(student)
+        let session = WorkoutSession(title: "导入测试", status: .planned)
+        session.student = student
+        source.insert(session)
+        let exercise = ExerciseEntry(name: "深蹲", category: .strength, plannedSets: 1, plannedReps: 8, plannedDurationMinutes: 10)
+        exercise.session = session
+        source.insert(exercise)
+        try source.save()
+
+        var archive = try BackupV2Service.decode(BackupV2Service.encode(students: [student], templates: []))
+        let duplicate = try XCTUnwrap(archive.students.first?.sessions.first?.exercises.first)
+        archive.students[0].sessions[0].exercises.append(duplicate)
+
+        let destinationContainer = try makeContainer()
+        let destination = destinationContainer.mainContext
+        let localStudent = Student(name: "本地学员", gender: .other, age: 30, fitnessLevel: .intermediate, weightKg: 70, heightCm: 175)
+        localStudent.id = student.id
+        destination.insert(localStudent)
+        let localSession = WorkoutSession(title: "本地课程", status: .planned)
+        localSession.id = session.id
+        localSession.student = localStudent
+        destination.insert(localSession)
+        try destination.save()
+
+        _ = try BackupV2Service.insert(archive, into: destination)
+
+        XCTAssertEqual(localSession.exercises.count, 1)
+        XCTAssertEqual(try destination.fetchCount(FetchDescriptor<ExerciseEntry>()), 1)
+    }
+
     func testRoundTripPreservesPausedCreditTrackingIntent() throws {
         let sourceContainer = try makeContainer()
         let source = sourceContainer.mainContext

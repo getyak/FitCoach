@@ -55,6 +55,8 @@ final class SessionServiceTests: XCTestCase {
         XCTAssertEqual(student.remainingSessions, 9)
         XCTAssertEqual(student.creditTransactions.filter { $0.kind == .consume }.count, 1)
         XCTAssertEqual(session.status, .completed)
+        XCTAssertFalse(session.summary.isEmpty)
+        XCTAssertTrue(session.summary.contains("1 组"))
     }
 
     func testReopenRefundsOnceAndRecompleteKeepsNetSingleDebit() throws {
