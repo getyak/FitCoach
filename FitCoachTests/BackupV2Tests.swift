@@ -107,6 +107,32 @@ final class BackupV2Tests: XCTestCase {
         XCTAssertEqual(student.measurements.first?.weightKg, 60)
     }
 
+    func testSameLegacyBackupImportedTwiceIsNoOp() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let backup = StudentBackup(
+            name: "旧学员", gender: Gender.female.rawValue, age: 28,
+            fitnessLevel: FitnessLevel.intermediate.rawValue, weightKg: 60, heightCm: 165,
+            bodyFatPercentage: 22, hipCm: nil, chestCm: nil, waistCm: 70,
+            fitnessGoal: "恢复训练", notes: "", isOwner: false, totalPurchasedSessions: 8,
+            workoutSessions: []
+        )
+        let payload = BackupPayload(exportedAt: Date(timeIntervalSince1970: 1_700_000_000), students: [backup])
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(payload)
+
+        let first = try LegacyBackupService.insert(payload, sourceData: data, into: context)
+        let second = try LegacyBackupService.insert(payload, sourceData: data, into: context)
+
+        XCTAssertEqual(first, LegacyBackupImportResult(importedStudents: 1, skippedStudents: 0))
+        XCTAssertEqual(second, LegacyBackupImportResult(importedStudents: 0, skippedStudents: 1))
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<Student>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<BodyMeasurement>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CreditTransaction>()), 1)
+    }
+
     func testImportCompletesExistingStudentInsteadOfSkippingChildren() throws {
         let sourceContainer = try makeContainer()
         let source = sourceContainer.mainContext
@@ -180,6 +206,33 @@ final class BackupV2Tests: XCTestCase {
         XCTAssertEqual(localExercise.sets.count, 2)
         XCTAssertEqual(localExercise.sortedSets.first?.actualWeightKg, 55, "已有本地值应保留")
         XCTAssertEqual(localExercise.sortedSets.last?.actualWeightKg, 62.5)
+    }
+
+    func testMalformedArchiveDuplicateSetIDDoesNotCreateDuplicateRows() throws {
+        let sourceContainer = try makeContainer()
+        let source = sourceContainer.mainContext
+        let student = Student(name: "重复组", gender: .other, age: 30, fitnessLevel: .intermediate, weightKg: 70, heightCm: 175)
+        source.insert(student)
+        let session = WorkoutSession(title: "导入测试", status: .planned)
+        session.student = student
+        source.insert(session)
+        let exercise = ExerciseEntry(name: "深蹲", category: .strength, plannedSets: 1, plannedReps: 8, plannedDurationMinutes: 10)
+        exercise.session = session
+        source.insert(exercise)
+        let set = WorkoutSet(sortIndex: 0, actualWeightKg: 60, actualReps: 8)
+        set.exercise = exercise
+        source.insert(set)
+        try source.save()
+
+        var archive = try BackupV2Service.decode(BackupV2Service.encode(students: [student], templates: []))
+        let duplicate = try XCTUnwrap(archive.students.first?.sessions.first?.exercises.first?.sets.first)
+        archive.students[0].sessions[0].exercises[0].sets.append(duplicate)
+
+        let destinationContainer = try makeContainer()
+        let destination = destinationContainer.mainContext
+        _ = try BackupV2Service.insert(archive, into: destination)
+
+        XCTAssertEqual(try destination.fetchCount(FetchDescriptor<WorkoutSet>()), 1)
     }
 
     func testRoundTripPreservesPausedCreditTrackingIntent() throws {

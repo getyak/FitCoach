@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import CryptoKit
 
 /// 导出/导入用的数据结构，跟 SwiftData 的 @Model 分开，方便编码成 JSON 文件。
 
@@ -45,6 +46,39 @@ struct StudentBackup: Codable {
 struct BackupPayload: Codable {
     var exportedAt: Date
     var students: [StudentBackup]
+}
+
+struct LegacyBackupImportResult: Equatable {
+    var importedStudents: Int
+    var skippedStudents: Int
+}
+
+@MainActor
+enum LegacyBackupService {
+    static func insert(
+        _ payload: BackupPayload,
+        sourceData: Data,
+        into context: ModelContext
+    ) throws -> LegacyBackupImportResult {
+        let digest = SHA256.hash(data: sourceData).map { String(format: "%02x", $0) }.joined()
+        let receiptKey = "legacy-backup-import:\(digest)"
+        let markers = try context.fetch(FetchDescriptor<MigrationMarker>())
+        guard !markers.contains(where: { $0.key == receiptKey }) else {
+            return LegacyBackupImportResult(importedStudents: 0, skippedStudents: payload.students.count)
+        }
+
+        do {
+            for student in payload.students {
+                insertBackupStudent(student, into: context)
+            }
+            context.insert(MigrationMarker(key: receiptKey))
+            try context.save()
+            return LegacyBackupImportResult(importedStudents: payload.students.count, skippedStudents: 0)
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
 }
 
 extension ExerciseEntry {

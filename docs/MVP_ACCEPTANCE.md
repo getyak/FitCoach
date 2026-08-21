@@ -48,14 +48,14 @@
 
 ## 当前自动化证据
 
-- 17/17 条单元/集成测试通过，包含文件型 store 关闭重开后不重复回填。
+- 20/20 条单元/集成测试通过，包含 exact V1 file-backed store 原地打开、迁移重复 UUID 修复、关闭重开后 ID/对象数/余额不变、旧版备份重复导入 no-op，以及畸形归档重复 set ID 防护。
 - 6/6 条 UI 测试通过，包含完整扣课主链、两类强退恢复和 AX5 frame containment；字号注入修复后 SE 专项复跑 7.554 秒通过。
-- iPhone 17 Pro 最终套件暖启动首帧 3 次平均 1.126 秒，相对标准差 2.651%。
+- iPhone 17 Pro 最终套件暖启动首帧 3 次平均 1.099 秒，相对标准差 1.571%。
 - iPhone SE（第三代）系统 AX5 + 深色模式专项链路通过；自动化 AX5 使用测试专用 SwiftUI 环境注入，避免测试参数静默回落到默认字号。
 
 ## 发布前仍需人工验证
 
 - 真机 VoiceOver 完整走查与触觉强度确认。
 - MVP 明确为简体中文；开放其他语言前需完成全链路 String Catalog 与截图矩阵。
-- 在由 exact V1 schema 生成、包含多位学员和多节历史课程的 file-backed fixture 上完成 VersionedSchema 原地迁移回归；这是覆盖已有正式版本前的发布门槛。
+- exact V1 file-backed fixture 与同模拟器覆盖安装回归已通过；fixture 来自基线 `38151ee`，SHA-256 为 `eb9c21d37ae8b7b0223e07edfc75833c5e0105d217de14b48a5689d2cfc9620f`。当前为已验证的 SwiftData 推断式迁移，不等于所有 iOS 版本均已验证；正式扩大覆盖范围前需补目标系统矩阵，并在未来破坏性 schema 修改前引入 `VersionedSchema`/`SchemaMigrationPlan`。
 - TestFlight Release 构建的启动时间、内存和长列表性能。

@@ -7,10 +7,22 @@ enum LegacyDataBackfill {
     private static let markerKey = "legacy-v3-backfill"
 
     static func run(in context: ModelContext) throws {
+        do {
+            try performRun(in: context)
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+
+    private static func performRun(in context: ModelContext) throws {
         let markers = try context.fetch(FetchDescriptor<MigrationMarker>())
         guard !markers.contains(where: { $0.key == markerKey }) else { return }
 
         let students = try context.fetch(FetchDescriptor<Student>())
+        let sessions = try context.fetch(FetchDescriptor<WorkoutSession>())
+        let exercises = try context.fetch(FetchDescriptor<ExerciseEntry>())
+        repairLegacyDuplicateIDs(students: students, sessions: sessions, exercises: exercises)
 
         for student in students {
             if student.tracksCreditsFlag == nil {
@@ -91,5 +103,32 @@ enum LegacyDataBackfill {
 
         context.insert(MigrationMarker(key: markerKey))
         try context.save()
+    }
+
+    /// SwiftData evaluates a newly-added property default once while inferring a
+    /// legacy migration, so every old row can receive the same UUID. Repair IDs
+    /// before deriving ledger idempotency keys, then persist them with the marker.
+    private static func repairLegacyDuplicateIDs(
+        students: [Student],
+        sessions: [WorkoutSession],
+        exercises: [ExerciseEntry]
+    ) {
+        var studentIDs = Set<UUID>()
+        for student in students {
+            while studentIDs.contains(student.id) { student.id = UUID() }
+            studentIDs.insert(student.id)
+        }
+
+        var sessionIDs = Set<UUID>()
+        for session in sessions {
+            while sessionIDs.contains(session.id) { session.id = UUID() }
+            sessionIDs.insert(session.id)
+        }
+
+        var exerciseIDs = Set<UUID>()
+        for exercise in exercises {
+            while exerciseIDs.contains(exercise.id) { exercise.id = UUID() }
+            exerciseIDs.insert(exercise.id)
+        }
     }
 }

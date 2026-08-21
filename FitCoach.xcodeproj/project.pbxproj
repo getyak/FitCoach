@@ -22,6 +22,7 @@
 		6560E3B5E5481BF9606E10B2 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A028AE5A7411E17636C43FB6 /* OnboardingView.swift */; };
 		6B59FB520D515F5AEF73085E /* ActiveWorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE12222859B86664A5A47A08 /* ActiveWorkoutView.swift */; };
 		7B076B3CC95493A204EFB1B5 /* AddStudentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECAD1C8BD4E0D5B27D191615 /* AddStudentView.swift */; };
+		7B3E555D14FE66D98FF42ED0 /* FitCoachV1.store in Resources */ = {isa = PBXBuildFile; fileRef = 037A57A8EE87C47DA870D2BC /* FitCoachV1.store */; };
 		845E2FCF39E6B5E08C1F94DB /* AddWorkoutSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED7DE9AAEB46C8E151233C2 /* AddWorkoutSessionView.swift */; };
 		881C6163E9F5795649C0C811 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40FFE2E29414939F2B219251 /* TodayView.swift */; };
 		8C170BEC7E14FBFF13E2401D /* StudentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BB996ACA965F1175244FB2A /* StudentDetailView.swift */; };
@@ -30,6 +31,7 @@
 		8F8D757184207745E58EB5E1 /* SessionHistoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5990F5C9AF133D37AE09CFDA /* SessionHistoryDetailView.swift */; };
 		AD404DEB401FFE78441FA8DC /* WorkoutCompletionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF5593EF10F1B273943AE66C /* WorkoutCompletionView.swift */; };
 		AEDFC4425F0072AFC1294A0E /* TrainingModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3A19A358A5C009A0A89321C /* TrainingModels.swift */; };
+		BD1D2CCE8619444F15FBF86A /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 14C3F397CE3CC5084B221158 /* README.md */; };
 		BFF47BDE4A8C76903A58B144 /* BackupV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47B4B04863232260F7BB41B4 /* BackupV2Tests.swift */; };
 		C73DEE7BCBBF059D6F934246 /* DemoDataSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93AF98198C341AEB0E7D2B0D /* DemoDataSeeder.swift */; };
 		CD2C5C03F45B384B9F92BFAE /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D323E88F1E845E2C00F71458 /* AppTheme.swift */; };
@@ -64,8 +66,10 @@
 		01CB85E9030E4074F6C47563 /* FitCoachApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitCoachApp.swift; sourceTree = "<group>"; };
 		01CED3F9B65EE864B80B9662 /* LegacyDataBackfill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyDataBackfill.swift; sourceTree = "<group>"; };
 		0343357B014518A3ADFF6179 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		037A57A8EE87C47DA870D2BC /* FitCoachV1.store */ = {isa = PBXFileReference; path = FitCoachV1.store; sourceTree = "<group>"; };
 		07A721E7F964AA9414BFF492 /* FitCoachUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FitCoachUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0B1D07567FC46E6C33EB91BA /* WorkoutSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSession.swift; sourceTree = "<group>"; };
+		14C3F397CE3CC5084B221158 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		1D4B4C15D7903D4D2EB1879A /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
 		394A42D7DC17BA8D0CA5BD35 /* WorkoutSessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSessionDetailView.swift; sourceTree = "<group>"; };
 		3BDB78072240F889AE623256 /* FitCoachTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FitCoachTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -117,6 +121,15 @@
 				815CAFB6EC8E6368893FEA93 /* FitCoachSmokeUITests.swift */,
 			);
 			path = FitCoachUITests;
+			sourceTree = "<group>";
+		};
+		1E47EC1F2F57D613CBB74621 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				037A57A8EE87C47DA870D2BC /* FitCoachV1.store */,
+				14C3F397CE3CC5084B221158 /* README.md */,
+			);
+			path = Fixtures;
 			sourceTree = "<group>";
 		};
 		2518C457F7927FF50A1052B2 /* Models */ = {
@@ -192,6 +205,7 @@
 		DE3EBA910EF5BFEB5DAA9FF8 /* FitCoachTests */ = {
 			isa = PBXGroup;
 			children = (
+				1E47EC1F2F57D613CBB74621 /* Fixtures */,
 				47B4B04863232260F7BB41B4 /* BackupV2Tests.swift */,
 				954781C58DB0B28999A9C41E /* SessionServiceTests.swift */,
 			);
@@ -260,6 +274,7 @@
 			buildConfigurationList = 17BB69F0E1E338A7CE205402 /* Build configuration list for PBXNativeTarget "FitCoachTests" */;
 			buildPhases = (
 				8C54FC5DB4790A100C1E763A /* Sources */,
+				CD92226AA3DFD43AF9293EBA /* Resources */,
 			);
 			buildRules = (
 			);
@@ -318,6 +333,15 @@
 			files = (
 				8C1755545D865747CBF1B818 /* Assets.xcassets in Resources */,
 				35B57F7192DD5BEA053476BC /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CD92226AA3DFD43AF9293EBA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7B3E555D14FE66D98FF42ED0 /* FitCoachV1.store in Resources */,
+				BD1D2CCE8619444F15FBF86A /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

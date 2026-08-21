@@ -45,6 +45,8 @@ targets:
     platform: iOS
     sources:
       - path: FitCoachTests
+    resources:
+      - path: FitCoachTests/Fixtures
     dependencies:
       - target: FitCoach
     settings:

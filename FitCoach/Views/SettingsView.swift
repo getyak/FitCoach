@@ -125,14 +125,12 @@ struct SettingsView: View {
                     let decoder = JSONDecoder()
                     decoder.dateDecodingStrategy = .iso8601
                     let payload = try decoder.decode(BackupPayload.self, from: data)
-                    for studentBackup in payload.students {
-                        insertBackupStudent(studentBackup, into: modelContext)
-                    }
-                    try modelContext.save()
+                    let result = try LegacyBackupService.insert(payload, sourceData: data, into: modelContext)
                     statusIsError = false
-                    statusMessage = "旧版备份导入成功：\(payload.students.count) 位学员"
+                    statusMessage = "旧版备份导入：新增 \(result.importedStudents) 位，跳过 \(result.skippedStudents) 位"
                 }
             } catch {
+                modelContext.rollback()
                 statusIsError = true
                 statusMessage = "\(loc.t("导入失败"))：\(error.localizedDescription)"
             }

@@ -265,6 +265,72 @@ final class SessionServiceTests: XCTestCase {
         }
     }
 
+    func testExactV1StoreMigratesBackfillsAndReopensIdempotently() throws {
+        let sourceURL = try XCTUnwrap(
+            Bundle(for: Self.self).url(forResource: "FitCoachV1", withExtension: "store"),
+            "Exact V1 fixture must be copied into the test bundle"
+        )
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("FitCoach-v1-migration-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = directory.appendingPathComponent("FitCoach.store")
+        try FileManager.default.copyItem(at: sourceURL, to: storeURL)
+
+        var studentIDs = Set<UUID>()
+        var sessionIDs = Set<UUID>()
+        var exerciseIDs = Set<UUID>()
+
+        do {
+            let container = try makeFileContainer(at: storeURL)
+            let context = container.mainContext
+            try LegacyDataBackfill.run(in: context)
+
+            let students = try context.fetch(FetchDescriptor<Student>())
+            let sessions = try context.fetch(FetchDescriptor<WorkoutSession>())
+            let exercises = try context.fetch(FetchDescriptor<ExerciseEntry>())
+            studentIDs = Set(students.map(\.id))
+            sessionIDs = Set(sessions.map(\.id))
+            exerciseIDs = Set(exercises.map(\.id))
+
+            XCTAssertEqual(students.count, 3)
+            XCTAssertEqual(sessions.count, 3)
+            XCTAssertEqual(exercises.count, 4)
+            XCTAssertEqual(studentIDs.count, 3, "Every migrated legacy student needs a stable unique UUID")
+            XCTAssertEqual(sessionIDs.count, 3, "Every migrated legacy session needs a stable unique UUID")
+            XCTAssertEqual(exerciseIDs.count, 4, "Every migrated legacy exercise needs a stable unique UUID")
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<WorkoutSet>()), 9)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<BodyMeasurement>()), 3)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 1)
+
+            let tracked = try XCTUnwrap(students.first { $0.name == "旧版林悦" })
+            XCTAssertTrue(tracked.tracksCredits)
+            XCTAssertEqual(tracked.remainingSessions, 11)
+            XCTAssertEqual(tracked.creditTransactions.filter { $0.kind == .openingBalance }.count, 1)
+            XCTAssertEqual(tracked.creditTransactions.filter { $0.kind == .consume }.count, 1)
+            XCTAssertEqual(tracked.workoutSessions.filter { $0.status == .completed }.count, 1)
+            XCTAssertEqual(tracked.workoutSessions.filter { $0.status == .planned }.count, 1)
+
+            let untracked = try XCTUnwrap(students.first { $0.name == "旧版陈屿" })
+            XCTAssertFalse(untracked.tracksCredits)
+            XCTAssertTrue(untracked.creditTransactions.isEmpty)
+        }
+
+        do {
+            let container = try makeFileContainer(at: storeURL)
+            let context = container.mainContext
+            try LegacyDataBackfill.run(in: context)
+
+            XCTAssertEqual(Set(try context.fetch(FetchDescriptor<Student>()).map(\.id)), studentIDs)
+            XCTAssertEqual(Set(try context.fetch(FetchDescriptor<WorkoutSession>()).map(\.id)), sessionIDs)
+            XCTAssertEqual(Set(try context.fetch(FetchDescriptor<ExerciseEntry>()).map(\.id)), exerciseIDs)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<WorkoutSet>()), 9)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<BodyMeasurement>()), 3)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<CreditTransaction>()), 2)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 1)
+        }
+    }
+
     private func makeStudent(in context: ModelContext) -> Student {
         let student = Student(
             name: "小林",

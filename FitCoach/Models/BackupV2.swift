@@ -389,7 +389,9 @@ enum BackupV2Service {
     }
 
     private static func insertExercises(_ items: [ExerciseBackupV2], into session: WorkoutSession, context: ModelContext) {
+        var insertedExerciseIDs = Set<UUID>()
         for item in items {
+            guard insertedExerciseIDs.insert(item.id).inserted else { continue }
             let exercise = ExerciseEntry(name: item.name, category: ExerciseCategory(rawValue: item.category) ?? .strength, cardioIntensity: item.cardioIntensity.flatMap(CardioIntensity.init(rawValue:)), sortIndex: item.sortIndex, plannedSets: item.plannedSets, plannedReps: item.plannedReps, plannedRestSeconds: item.plannedRestSeconds, plannedDurationMinutes: item.plannedDurationMinutes)
             exercise.id = item.id
             exercise.notes = item.notes
@@ -401,7 +403,9 @@ enum BackupV2Service {
             exercise.isCompleted = item.isCompleted ?? false
             exercise.session = session
             context.insert(exercise)
+            var insertedSetIDs = Set<UUID>()
             for setItem in item.sets {
+                guard insertedSetIDs.insert(setItem.id).inserted else { continue }
                 let set = WorkoutSet(id: setItem.id, sortIndex: setItem.sortIndex, plannedWeightKg: setItem.plannedWeightKg, plannedReps: setItem.plannedReps, actualWeightKg: setItem.actualWeightKg, actualReps: setItem.actualReps, rpe: setItem.rpe, notes: setItem.notes, isCompleted: setItem.isCompleted, completedAt: setItem.completedAt)
                 set.exercise = exercise
                 context.insert(set)
@@ -418,11 +422,12 @@ enum BackupV2Service {
                 continue
             }
 
-            let existingSetIDs = Set(existing.sets.map(\.id))
+            var existingSetIDs = Set(existing.sets.map(\.id))
             for setItem in item.sets where !existingSetIDs.contains(setItem.id) {
                 let set = WorkoutSet(id: setItem.id, sortIndex: setItem.sortIndex, plannedWeightKg: setItem.plannedWeightKg, plannedReps: setItem.plannedReps, actualWeightKg: setItem.actualWeightKg, actualReps: setItem.actualReps, rpe: setItem.rpe, notes: setItem.notes, isCompleted: setItem.isCompleted, completedAt: setItem.completedAt)
                 set.exercise = existing
                 context.insert(set)
+                existingSetIDs.insert(setItem.id)
             }
             exercisesByID[item.id] = existing
         }
