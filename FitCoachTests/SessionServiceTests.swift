@@ -217,7 +217,26 @@ final class SessionServiceTests: XCTestCase {
         XCTAssertEqual(student.creditTransactions.filter { $0.kind == .openingBalance }.count, 1)
         XCTAssertEqual(student.creditTransactions.filter { $0.kind == .consume }.count, 1)
         XCTAssertEqual(student.remainingSessions, 9)
-        XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 2)
+    }
+
+    func testUUIDRepairRunsEvenWhenLegacyBackfillMarkerAlreadyExists() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let duplicateID = UUID()
+        let first = makeStudent(in: context)
+        first.id = duplicateID
+        let second = makeStudent(in: context)
+        second.name = "第二位"
+        second.id = duplicateID
+        context.insert(MigrationMarker(key: "legacy-v3-backfill"))
+        try context.save()
+
+        try LegacyDataBackfill.run(in: context)
+        try LegacyDataBackfill.run(in: context)
+
+        XCTAssertEqual(Set([first.id, second.id]).count, 2)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 2)
     }
 
     func testFileBackedStoreReopensWithoutRepeatingBackfill() throws {
@@ -248,7 +267,7 @@ final class SessionServiceTests: XCTestCase {
 
             XCTAssertEqual(exercise.sets.count, 2)
             XCTAssertEqual(student.creditTransactions.count, 2)
-            XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 1)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 2)
         }
 
         do {
@@ -261,7 +280,7 @@ final class SessionServiceTests: XCTestCase {
             XCTAssertEqual(students.first?.id, expectedStudentID)
             XCTAssertEqual(try context.fetchCount(FetchDescriptor<WorkoutSet>()), 2)
             XCTAssertEqual(try context.fetchCount(FetchDescriptor<CreditTransaction>()), 2)
-            XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 1)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 2)
         }
     }
 
@@ -301,7 +320,7 @@ final class SessionServiceTests: XCTestCase {
             XCTAssertEqual(exerciseIDs.count, 4, "Every migrated legacy exercise needs a stable unique UUID")
             XCTAssertEqual(try context.fetchCount(FetchDescriptor<WorkoutSet>()), 9)
             XCTAssertEqual(try context.fetchCount(FetchDescriptor<BodyMeasurement>()), 3)
-            XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 1)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 2)
 
             let tracked = try XCTUnwrap(students.first { $0.name == "旧版林悦" })
             XCTAssertTrue(tracked.tracksCredits)
@@ -327,7 +346,7 @@ final class SessionServiceTests: XCTestCase {
             XCTAssertEqual(try context.fetchCount(FetchDescriptor<WorkoutSet>()), 9)
             XCTAssertEqual(try context.fetchCount(FetchDescriptor<BodyMeasurement>()), 3)
             XCTAssertEqual(try context.fetchCount(FetchDescriptor<CreditTransaction>()), 2)
-            XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 1)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 2)
         }
     }
 

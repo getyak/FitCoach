@@ -5,6 +5,7 @@ import SwiftData
 @MainActor
 enum LegacyDataBackfill {
     private static let markerKey = "legacy-v3-backfill"
+    private static let uuidRepairMarkerKey = "legacy-uuid-repair-v1"
 
     static func run(in context: ModelContext) throws {
         do {
@@ -17,12 +18,18 @@ enum LegacyDataBackfill {
 
     private static func performRun(in context: ModelContext) throws {
         let markers = try context.fetch(FetchDescriptor<MigrationMarker>())
+        if !markers.contains(where: { $0.key == uuidRepairMarkerKey }) {
+            let students = try context.fetch(FetchDescriptor<Student>())
+            let sessions = try context.fetch(FetchDescriptor<WorkoutSession>())
+            let exercises = try context.fetch(FetchDescriptor<ExerciseEntry>())
+            repairLegacyDuplicateIDs(students: students, sessions: sessions, exercises: exercises)
+            context.insert(MigrationMarker(key: uuidRepairMarkerKey))
+            try context.save()
+        }
+
         guard !markers.contains(where: { $0.key == markerKey }) else { return }
 
         let students = try context.fetch(FetchDescriptor<Student>())
-        let sessions = try context.fetch(FetchDescriptor<WorkoutSession>())
-        let exercises = try context.fetch(FetchDescriptor<ExerciseEntry>())
-        repairLegacyDuplicateIDs(students: students, sessions: sessions, exercises: exercises)
 
         for student in students {
             if student.tracksCreditsFlag == nil {
