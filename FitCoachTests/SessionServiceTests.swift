@@ -105,6 +105,72 @@ final class SessionServiceTests: XCTestCase {
         XCTAssertEqual(student.sortedMeasurements.first?.weightKg, 65.2)
     }
 
+    func testUntrackedStudentNeverGetsNegativeCreditLedger() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let student = Student(name: "阿青", gender: .other, age: 30, fitnessLevel: .beginner, weightKg: 70, heightCm: 175)
+        context.insert(student)
+        let session = makeSession(for: student, in: context)
+
+        try SessionService(context: context).complete(session)
+
+        XCTAssertNil(student.remainingSessions)
+        XCTAssertTrue(student.creditTransactions.isEmpty)
+    }
+
+    func testRenewalCreatesLedgerTransactionAndChangesBalance() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let student = makeStudent(in: context)
+        let service = SessionService(context: context)
+        try service.createOpeningBalance(for: student, amount: 10)
+
+        try service.adjustPurchasedCredits(for: student, newTotal: 20)
+
+        XCTAssertEqual(student.remainingSessions, 20)
+        XCTAssertEqual(student.creditTransactions.filter { $0.kind == .purchase }.map(\.amount), [10])
+    }
+
+    func testCannotCompleteWithoutRecordedWork() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let student = makeStudent(in: context)
+        let session = makeSession(for: student, in: context, completed: false)
+
+        XCTAssertThrowsError(try SessionService(context: context).complete(session)) { error in
+            XCTAssertEqual(error as? SessionServiceError, .noCompletedWork)
+        }
+        XCTAssertEqual(session.status, .inProgress)
+        XCTAssertTrue(student.creditTransactions.isEmpty)
+    }
+
+    func testLegacyBackfillIsIdempotent() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let student = makeStudent(in: context)
+        let session = WorkoutSession(title: "旧训练", status: .planned)
+        session.statusCode = nil
+        session.student = student
+        context.insert(session)
+        let exercise = ExerciseEntry(name: "深蹲", category: .strength, plannedSets: 3, plannedReps: 8, plannedRestSeconds: 60, plannedDurationMinutes: 10)
+        exercise.actualSets = 2
+        exercise.actualReps = 8
+        exercise.isCompleted = true
+        exercise.session = session
+        context.insert(exercise)
+        try context.save()
+
+        try LegacyDataBackfill.run(in: context)
+        try LegacyDataBackfill.run(in: context)
+
+        XCTAssertEqual(exercise.sets.count, 3)
+        XCTAssertEqual(exercise.sets.filter(\.isCompleted).count, 2)
+        XCTAssertEqual(student.measurements.count, 1)
+        XCTAssertEqual(student.creditTransactions.filter { $0.kind == .openingBalance }.count, 1)
+        XCTAssertEqual(student.creditTransactions.filter { $0.kind == .consume }.count, 1)
+        XCTAssertEqual(student.remainingSessions, 9)
+    }
+
     private func makeStudent(in context: ModelContext) -> Student {
         let student = Student(
             name: "小林",
@@ -119,7 +185,7 @@ final class SessionServiceTests: XCTestCase {
         return student
     }
 
-    private func makeSession(for student: Student, in context: ModelContext) -> WorkoutSession {
+    private func makeSession(for student: Student, in context: ModelContext, completed: Bool = true) -> WorkoutSession {
         let session = WorkoutSession(title: "下肢力量", status: .inProgress)
         session.student = student
         context.insert(session)
@@ -140,7 +206,9 @@ final class SessionServiceTests: XCTestCase {
             plannedWeightKg: 20,
             plannedReps: 10,
             actualWeightKg: 20,
-            actualReps: 10
+            actualReps: 10,
+            isCompleted: completed,
+            completedAt: completed ? Date() : nil
         )
         set.exercise = exercise
         context.insert(set)

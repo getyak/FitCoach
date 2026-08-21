@@ -13,6 +13,7 @@ struct TodayView: View {
     @State private var showingAddStudent = false
     @State private var showingNewSession = false
     @State private var errorMessage: String?
+    @State private var selectedStudentID: UUID?
 
     private var inProgressSession: WorkoutSession? {
         students
@@ -22,7 +23,8 @@ struct TodayView: View {
     }
 
     private var focusStudent: Student? {
-        inProgressSession?.student
+        students.first(where: { $0.id == selectedStudentID })
+            ?? inProgressSession?.student
             ?? students.first(where: { !$0.workoutSessions.isEmpty })
             ?? students.first
     }
@@ -39,6 +41,24 @@ struct TodayView: View {
                 TodayHeader()
 
                 if let student = focusStudent {
+                    if students.count > 1 {
+                        Menu {
+                            ForEach(students) { candidate in
+                                Button {
+                                    selectedStudentID = candidate.id
+                                } label: {
+                                    if candidate.id == student.id {
+                                        Label(candidate.name, systemImage: "checkmark")
+                                    } else {
+                                        Text(candidate.name)
+                                    }
+                                }
+                            }
+                        } label: {
+                            Label("切换学员", systemImage: "person.2")
+                        }
+                        .minimumTapTarget()
+                    }
                     FocusClientCard(
                         student: student,
                         previousSession: lastCompletedSession,
@@ -77,7 +97,9 @@ struct TodayView: View {
         }
         .sheet(isPresented: $showingNewSession) {
             if let focusStudent {
-                AddWorkoutSessionView(student: focusStudent)
+                AddWorkoutSessionView(student: focusStudent, startImmediately: true) { session in
+                    activeSession = session
+                }
             }
         }
         .fullScreenCover(item: $activeSession) { session in
@@ -112,16 +134,17 @@ struct TodayView: View {
 }
 
 private struct TodayHeader: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(Date.now.formatted(.dateTime.month(.wide).day().weekday(.wide)))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AppTheme.brand)
-            Text("把注意力留给学员")
-                .font(.largeTitle.bold())
-            Text("从上一次继续，不从空白开始。")
-                .font(.body)
-                .foregroundStyle(.secondary)
+        Group {
+            if !dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(Date.now.formatted(.dateTime.month(.wide).day().weekday(.wide)))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.brand)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 10)
@@ -129,6 +152,7 @@ private struct TodayHeader: View {
 }
 
 private struct FocusClientCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let student: Student
     let previousSession: WorkoutSession?
     let activeSession: WorkoutSession?
@@ -138,25 +162,23 @@ private struct FocusClientCard: View {
     var body: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 12) {
-                    Text(String(student.name.prefix(1)))
-                        .font(.title2.bold())
-                        .frame(width: 52, height: 52)
-                        .foregroundStyle(.white)
-                        .background(AppTheme.brand, in: Circle())
-                        .accessibilityHidden(true)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(activeSession == nil ? "建议下一位" : "训练进行中")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(activeSession == nil ? AppTheme.brand : AppTheme.success)
-                        Text(student.name)
-                            .font(.title2.bold())
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 10) {
+                        clientIdentity
+                        primaryAction
+                        if let remaining = student.remainingSessions {
+                            MetricPill(label: "剩余课时", value: "\(remaining) 节")
+                                .accessibilityIdentifier("today.remainingCredits")
+                        }
                     }
-                    Spacer(minLength: 8)
-                    if let remaining = student.remainingSessions {
-                        MetricPill(label: "剩", value: "\(remaining) 节")
-                            .accessibilityIdentifier("today.remainingCredits")
+                } else {
+                    HStack(spacing: 12) {
+                        clientIdentity
+                        Spacer(minLength: 8)
+                        if let remaining = student.remainingSessions {
+                            MetricPill(label: "剩", value: "\(remaining) 节")
+                                .accessibilityIdentifier("today.remainingCredits")
+                        }
                     }
                 }
 
@@ -191,50 +213,95 @@ private struct FocusClientCard: View {
                     .accessibilityElement(children: .combine)
                 }
 
-                Button(action: onStart) {
-                    Label(
-                        activeSession == nil ? (previousSession == nil ? "创建第一节训练" : "沿用上次并开始") : "继续本节训练",
-                        systemImage: activeSession == nil ? "play.fill" : "arrow.right"
-                    )
+                if !dynamicTypeSize.isAccessibilitySize {
+                    primaryAction
                 }
-                .buttonStyle(PrimaryActionButtonStyle())
-                .accessibilityIdentifier("today.startWorkout")
             }
         }
+    }
+
+    private var clientIdentity: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(activeSession == nil ? "快速继续" : "训练进行中")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(activeSession == nil ? AppTheme.brand : AppTheme.success)
+                    Text(student.name)
+                        .font(.headline)
+                        .accessibilityIdentifier("today.focusName")
+                }
+            } else {
+                HStack(spacing: 12) {
+                    Text(String(student.name.prefix(1)))
+                        .font(.title2.bold())
+                        .frame(width: 48, height: 48)
+                        .foregroundStyle(.white)
+                        .background(AppTheme.brand, in: Circle())
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(activeSession == nil ? "快速继续" : "训练进行中")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(activeSession == nil ? AppTheme.brand : AppTheme.success)
+                        Text(student.name)
+                            .font(.title2.bold())
+                            .accessibilityIdentifier("today.focusName")
+                    }
+                }
+            }
+        }
+    }
+
+    private var primaryAction: some View {
+        Button(action: onStart) {
+            Label(
+                activeSession == nil ? (previousSession == nil ? "创建第一节训练" : "沿用上次并开始") : "继续本节训练",
+                systemImage: activeSession == nil ? "play.fill" : "arrow.right"
+            )
+        }
+        .buttonStyle(PrimaryActionButtonStyle())
+        .accessibilityIdentifier("today.startWorkout")
     }
 }
 
 private struct PreviousSessionSection: View {
     let session: WorkoutSession
+    @State private var isExpanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("上次完成")
-                    .font(.title3.bold())
-                Spacer()
-                Text("\(session.completedSetCount) 组")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-
-            ForEach(session.sortedExercises.prefix(3)) { exercise in
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(exercise.name)
-                            .font(.headline)
-                        Text(exercise.previousSummary)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+        AppCard {
+            DisclosureGroup(isExpanded: $isExpanded) {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(session.sortedExercises.prefix(3)) { exercise in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(exercise.name).font(.headline)
+                                Text(exercise.previousSummary)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(AppTheme.success)
+                                .accessibilityLabel("已完成")
+                        }
+                        .padding(.vertical, 4)
+                        .accessibilityElement(children: .combine)
                     }
-                    Spacer()
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(AppTheme.success)
-                        .accessibilityLabel("已完成")
                 }
-                .padding(.vertical, 4)
-                .accessibilityElement(children: .combine)
+                .padding(.top, 12)
+            } label: {
+                HStack {
+                    Label("上次训练详情", systemImage: "clock.arrow.circlepath")
+                        .font(.headline)
+                    Spacer()
+                    Text("\(session.completedSetCount) 组")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
             }
+            .tint(AppTheme.brand)
         }
     }
 }

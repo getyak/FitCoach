@@ -189,14 +189,13 @@ private struct TemplateStartView: View {
 }
 
 struct ProfileView: View {
-    @EnvironmentObject private var loc: LocalizationManager
-
     var body: some View {
         List {
             Section("偏好") {
-                Picker("语言", selection: $loc.language) {
-                    ForEach(AppLanguage.allCases) { language in Text(language.rawValue).tag(language) }
-                }
+                LabeledContent("语言", value: "简体中文")
+                Text("MVP 首发聚焦中文教练场景，其他语言将在完整适配后开放。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
             Section("数据") {
                 NavigationLink { SettingsView() } label: {

@@ -52,6 +52,88 @@ final class BackupV2Tests: XCTestCase {
         XCTAssertEqual(try destination.fetchCount(FetchDescriptor<CreditTransaction>()), 2)
     }
 
+    func testRoundTripPreservesLegacyCardioActuals() throws {
+        let sourceContainer = try makeContainer()
+        let source = sourceContainer.mainContext
+        let student = Student(name: "周教练", gender: .other, age: 31, fitnessLevel: .advanced, weightKg: 68, heightCm: 172)
+        source.insert(student)
+        let session = WorkoutSession(title: "有氧", status: .completed, consumesCredit: false)
+        session.student = student
+        source.insert(session)
+        let cardio = ExerciseEntry(name: "跑步", category: .cardio, cardioIntensity: .moderate, plannedDurationMinutes: 30)
+        cardio.actualDurationMinutes = 28
+        cardio.isCompleted = true
+        cardio.session = session
+        source.insert(cardio)
+        try source.save()
+
+        let archive = try BackupV2Service.decode(BackupV2Service.encode(students: [student], templates: []))
+        let destinationContainer = try makeContainer()
+        let destination = destinationContainer.mainContext
+        _ = try BackupV2Service.insert(archive, into: destination)
+        let imported = try XCTUnwrap(try destination.fetch(FetchDescriptor<ExerciseEntry>()).first)
+
+        XCTAssertEqual(imported.actualDurationMinutes, 28)
+        XCTAssertTrue(imported.isCompleted)
+        XCTAssertEqual(imported.cardioIntensityEnum, .moderate)
+    }
+
+    func testLegacyImportRestoresCompletedStatusSetsAndCredits() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let exercise = ExerciseEntryBackup(
+            name: "深蹲", category: ExerciseCategory.strength.rawValue, cardioIntensity: nil,
+            plannedSets: 3, plannedReps: 8, plannedRestSeconds: 90, plannedDurationMinutes: 10,
+            actualSets: 2, actualReps: 8, actualRestSeconds: 90, actualDurationMinutes: 9,
+            isCompleted: true
+        )
+        let backup = StudentBackup(
+            name: "旧学员", gender: Gender.female.rawValue, age: 28,
+            fitnessLevel: FitnessLevel.intermediate.rawValue, weightKg: 60, heightCm: 165,
+            bodyFatPercentage: nil, hipCm: nil, chestCm: nil, waistCm: nil,
+            fitnessGoal: "", notes: "", isOwner: false, totalPurchasedSessions: 10,
+            workoutSessions: [WorkoutSessionBackup(date: Date(), title: "旧训练", exercises: [exercise])]
+        )
+
+        insertBackupStudent(backup, into: context)
+        try context.save()
+
+        let student = try XCTUnwrap(try context.fetch(FetchDescriptor<Student>()).first)
+        let session = try XCTUnwrap(student.workoutSessions.first)
+        XCTAssertEqual(session.status, .completed)
+        XCTAssertEqual(session.exercises.first?.sets.filter(\.isCompleted).count, 2)
+        XCTAssertEqual(student.remainingSessions, 9)
+    }
+
+    func testImportCompletesExistingStudentInsteadOfSkippingChildren() throws {
+        let sourceContainer = try makeContainer()
+        let source = sourceContainer.mainContext
+        let sourceStudent = Student(name: "同一学员", gender: .female, age: 28, fitnessLevel: .intermediate, weightKg: 61, heightCm: 166, totalPurchasedSessions: 6)
+        source.insert(sourceStudent)
+        let measurement = BodyMeasurement(weightKg: 61)
+        measurement.student = sourceStudent
+        source.insert(measurement)
+        let session = WorkoutSession(title: "补全训练", status: .planned)
+        session.student = sourceStudent
+        source.insert(session)
+        try source.save()
+        let archive = try BackupV2Service.decode(BackupV2Service.encode(students: [sourceStudent], templates: []))
+
+        let destinationContainer = try makeContainer()
+        let destination = destinationContainer.mainContext
+        let existing = Student(name: "本地名称", gender: .female, age: 28, fitnessLevel: .intermediate, weightKg: 61, heightCm: 166, totalPurchasedSessions: 6)
+        existing.id = sourceStudent.id
+        destination.insert(existing)
+        try destination.save()
+
+        let result = try BackupV2Service.insert(archive, into: destination)
+
+        XCTAssertEqual(result, BackupImportResult(importedStudents: 0, skippedStudents: 1))
+        XCTAssertEqual(try destination.fetchCount(FetchDescriptor<Student>()), 1)
+        XCTAssertEqual(existing.measurements.count, 1)
+        XCTAssertEqual(existing.workoutSessions.count, 1)
+    }
+
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(
             for: Student.self,

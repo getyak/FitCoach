@@ -3,6 +3,8 @@ import SwiftData
 
 struct AddWorkoutSessionView: View {
     @Bindable var student: Student
+    var startImmediately = false
+    var onSaved: (WorkoutSession) -> Void = { _ in }
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var loc: LocalizationManager
@@ -11,6 +13,7 @@ struct AddWorkoutSessionView: View {
     @State private var date = Date()
     @State private var plannedExercises: [PlannedExerciseDraft] = []
     @State private var showingAddExercise = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -58,11 +61,25 @@ struct AddWorkoutSessionView: View {
                     plannedExercises.append(draft)
                 }
             }
+            .alert("保存失败", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("好", role: .cancel) { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "请稍后重试")
+            }
         }
     }
 
     private func saveSession() {
-        let session = WorkoutSession(date: date, title: title)
+        let session = WorkoutSession(
+            date: date,
+            title: title,
+            status: startImmediately ? .inProgress : .planned,
+            consumesCredit: student.tracksCredits
+        )
+        if startImmediately { session.startedAt = Date() }
         session.student = student
         modelContext.insert(session)
 
@@ -94,9 +111,11 @@ struct AddWorkoutSessionView: View {
         }
         do {
             try modelContext.save()
+            onSaved(session)
             dismiss()
         } catch {
             modelContext.rollback()
+            errorMessage = error.localizedDescription
         }
     }
 

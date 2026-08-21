@@ -121,13 +121,26 @@ private struct AddMeasurementView: View {
     }
 
     private func save() {
+        let weightValue = Double(weight)
+        let bodyFatValue = Double(bodyFat)
+        let waistValue = Double(waist)
+        let hipValue = Double(hip)
+        let chestValue = Double(chest)
+        guard valid(weight, value: weightValue, range: 20...400),
+              valid(bodyFat, value: bodyFatValue, range: 1...75),
+              valid(waist, value: waistValue, range: 30...300),
+              valid(hip, value: hipValue, range: 30...300),
+              valid(chest, value: chestValue, range: 30...300) else {
+            errorMessage = "请检查输入：体重 20–400 kg，体脂率 1–75%，围度 30–300 cm。"
+            return
+        }
         let record = BodyMeasurement(
             measuredAt: measuredAt,
-            weightKg: Double(weight),
-            bodyFatPercentage: Double(bodyFat),
-            hipCm: Double(hip),
-            chestCm: Double(chest),
-            waistCm: Double(waist),
+            weightKg: weightValue,
+            bodyFatPercentage: bodyFatValue,
+            hipCm: hipValue,
+            chestCm: chestValue,
+            waistCm: waistValue,
             notes: notes
         )
         record.student = student
@@ -144,6 +157,11 @@ private struct AddMeasurementView: View {
             modelContext.rollback()
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func valid(_ raw: String, value: Double?, range: ClosedRange<Double>) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty || value.map(range.contains) == true
     }
 }
 
@@ -176,40 +194,52 @@ private struct TrendSummaryCard: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if let latest = points.last?.value, let delta {
+                    if points.count >= 2, let latest = points.last?.value, let delta {
                         VStack(alignment: .trailing, spacing: 3) {
                             Text("\(latest.formatted()) \(unit)")
                                 .font(.title3.bold())
                                 .monospacedDigit()
                             Text("\(delta >= 0 ? "+" : "")\(delta.formatted(.number.precision(.fractionLength(1)))) \(unit)")
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(delta <= 0 ? AppTheme.success : .secondary)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
 
-                Chart(points, id: \.date) { point in
-                    LineMark(
-                        x: .value("日期", point.date),
-                        y: .value(title, point.value)
-                    )
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(AppTheme.brand)
-                    PointMark(
-                        x: .value("日期", point.date),
-                        y: .value(title, point.value)
-                    )
-                    .foregroundStyle(AppTheme.brand)
-                }
-                .frame(height: 150)
-                .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 3)) { _ in
-                        AxisGridLine().foregroundStyle(.clear)
-                        AxisValueLabel(format: .dateTime.month().day())
+                if points.count >= 2 {
+                    Chart(points, id: \.date) { point in
+                        LineMark(
+                            x: .value("日期", point.date),
+                            y: .value(title, point.value)
+                        )
+                        .interpolationMethod(.linear)
+                        .foregroundStyle(AppTheme.brand)
+                        PointMark(
+                            x: .value("日期", point.date),
+                            y: .value(title, point.value)
+                        )
+                        .foregroundStyle(AppTheme.brand)
                     }
+                    .frame(height: 150)
+                    .chartXAxis {
+                        AxisMarks(values: .automatic(desiredCount: 3)) { _ in
+                            AxisGridLine().foregroundStyle(.clear)
+                            AxisValueLabel(format: .dateTime.month().day())
+                        }
+                    }
+                    .accessibilityLabel("\(title)变化趋势，共 \(points.count) 个数据点")
+                    .accessibilityValue(trendAccessibilityValue)
+                } else {
+                    Label("该指标至少需要两次有效记录", systemImage: "chart.line.downtrend.xyaxis")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-                .accessibilityLabel("\(title)变化趋势")
             }
         }
+    }
+
+    private var trendAccessibilityValue: String {
+        guard let first = points.first, let last = points.last else { return "数据不足" }
+        return "从 \(first.value.formatted()) \(unit) 变化到 \(last.value.formatted()) \(unit)"
     }
 }

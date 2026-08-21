@@ -18,15 +18,18 @@ final class FitCoachSmokeUITests: XCTestCase {
         start.tap()
 
         XCTAssertTrue(app.descendants(matching: .any)["workout.previousPerformance"].waitForExistence(timeout: 5))
-        let firstSet = app.buttons["workout.set.0.complete"]
-        XCTAssertTrue(firstSet.exists)
-        firstSet.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["workout.restTimer"].waitForExistence(timeout: 2))
-
-        for _ in 0..<2 {
-            let next = app.buttons["workout.nextExercise"]
-            XCTAssertTrue(next.waitForExistence(timeout: 2))
-            next.tap()
+        for exerciseIndex in 0..<3 {
+            for _ in 0..<3 {
+                let completeCurrent = app.buttons["workout.completeCurrentSet"]
+                XCTAssertTrue(completeCurrent.waitForExistence(timeout: 2))
+                completeCurrent.tap()
+            }
+            XCTAssertTrue(app.descendants(matching: .any)["workout.restTimer"].waitForExistence(timeout: 2))
+            if exerciseIndex < 2 {
+                let next = app.buttons["workout.nextExercise"]
+                XCTAssertTrue(next.waitForExistence(timeout: 2))
+                next.tap()
+            }
         }
 
         let finish = app.buttons["workout.finish"]
@@ -65,7 +68,7 @@ final class FitCoachSmokeUITests: XCTestCase {
 
         let restoredSet = app.buttons["workout.set.0.complete"]
         XCTAssertTrue(restoredSet.waitForExistence(timeout: 5))
-        XCTAssertEqual(restoredSet.label, "已完成")
+        XCTAssertTrue(waitForLabel("已完成", on: restoredSet, timeout: 3))
         XCTAssertTrue(app.descendants(matching: .any)["workout.restTimer"].exists)
     }
 
@@ -80,5 +83,36 @@ final class FitCoachSmokeUITests: XCTestCase {
         let start = app.buttons["today.startWorkout"]
         XCTAssertTrue(start.waitForExistence(timeout: 5))
         XCTAssertTrue(start.isHittable)
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.exists)
+        XCTAssertLessThanOrEqual(start.frame.maxY, tabBar.frame.minY + 1)
+
+        let name = app.descendants(matching: .any)["today.focusName"]
+        let credits = app.descendants(matching: .any)["today.remainingCredits"]
+        XCTAssertTrue(name.exists)
+        XCTAssertTrue(credits.exists)
+        XCTAssertFalse(name.frame.intersects(credits.frame))
+
+        start.tap()
+        let completeSet = app.buttons["workout.set.0.complete"]
+        XCTAssertTrue(completeSet.waitForExistence(timeout: 5))
+        XCTAssertTrue(completeSet.isHittable)
+        XCTAssertTrue(app.descendants(matching: .any)["workout.control.重量"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["workout.control.次数"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["workout.control.RPE"].exists)
+        XCTAssertTrue(app.buttons["workout.completeCurrentSet"].isHittable)
+
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "Today-and-workout-AX5"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    private func waitForLabel(_ label: String, on element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", label),
+            object: element
+        )
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 }

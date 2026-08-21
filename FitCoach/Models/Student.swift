@@ -94,12 +94,18 @@ final class Student {
 
     /// 剩余课时 = 总课时 - 已经记录过的训练次数。没设置总课时就返回 nil（不追踪）。
     var remainingSessions: Int? {
+        guard tracksCredits else { return nil }
         if !creditTransactions.isEmpty {
             return creditTransactions.reduce(0) { $0 + $1.amount }
         }
         guard let total = totalPurchasedSessions else { return nil }
         let consumed = workoutSessions.filter(\.countsTowardCredit).count
         return total - consumed
+    }
+
+    /// 旧数据用课时包是否存在表达追踪意图；有账本后则以账本为权威。
+    var tracksCredits: Bool {
+        totalPurchasedSessions != nil || !creditTransactions.isEmpty
     }
 
     var sortedMeasurements: [BodyMeasurement] {

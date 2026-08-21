@@ -122,11 +122,6 @@ struct OnboardingView: View {
             }
             .navigationTitle(loc.t("完善个人信息"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    LanguageSwitcher()
-                }
-            }
         }
     }
 

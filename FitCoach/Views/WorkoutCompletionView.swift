@@ -9,6 +9,7 @@ struct WorkoutCompletionView: View {
     @State private var showingTrend = false
     @State private var errorMessage: String?
     @State private var summaryDraft: String = ""
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         NavigationStack {
@@ -26,11 +27,12 @@ struct WorkoutCompletionView: View {
                     }
                     .padding(.top, 20)
 
-                    HStack(spacing: 10) {
-                        CompletionMetric(value: durationText, label: "训练时长")
-                        CompletionMetric(value: "\(session.completedSetCount)", label: "完成组数")
-                        CompletionMetric(value: remainingText, label: "剩余课时")
-                            .accessibilityIdentifier("completion.remainingCredits")
+                    Group {
+                        if dynamicTypeSize.isAccessibilitySize {
+                            VStack(spacing: 10) { completionMetrics }
+                        } else {
+                            HStack(spacing: 10) { completionMetrics }
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
@@ -43,7 +45,12 @@ struct WorkoutCompletionView: View {
                             .accessibilityIdentifier("completion.summary")
                             .onChange(of: summaryDraft) { _, newValue in
                                 session.summary = newValue
-                                try? modelContext.save()
+                                do {
+                                    try modelContext.save()
+                                } catch {
+                                    modelContext.rollback()
+                                    errorMessage = error.localizedDescription
+                                }
                             }
                     }
 
@@ -98,6 +105,13 @@ struct WorkoutCompletionView: View {
 
     private var remainingText: String {
         session.student?.remainingSessions.map { "\($0) 节" } ?? "不追踪"
+    }
+
+    @ViewBuilder private var completionMetrics: some View {
+        CompletionMetric(value: durationText, label: "训练时长")
+        CompletionMetric(value: "\(session.completedSetCount)", label: "完成组数")
+        CompletionMetric(value: remainingText, label: "剩余课时")
+            .accessibilityIdentifier("completion.remainingCredits")
     }
 
     private func reopenSession() {

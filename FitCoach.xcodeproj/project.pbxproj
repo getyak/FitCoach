@@ -26,6 +26,7 @@
 		8C170BEC7E14FBFF13E2401D /* StudentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BB996ACA965F1175244FB2A /* StudentDetailView.swift */; };
 		8C1755545D865747CBF1B818 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8470225FA19D89C22644FB45 /* Assets.xcassets */; };
 		8D48C27C46BB444DA1375523 /* TemplatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A053832B2999103C43BA38FD /* TemplatesView.swift */; };
+		8F8D757184207745E58EB5E1 /* SessionHistoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5990F5C9AF133D37AE09CFDA /* SessionHistoryDetailView.swift */; };
 		AD404DEB401FFE78441FA8DC /* WorkoutCompletionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF5593EF10F1B273943AE66C /* WorkoutCompletionView.swift */; };
 		AEDFC4425F0072AFC1294A0E /* TrainingModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3A19A358A5C009A0A89321C /* TrainingModels.swift */; };
 		BFF47BDE4A8C76903A58B144 /* BackupV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47B4B04863232260F7BB41B4 /* BackupV2Tests.swift */; };
@@ -36,6 +37,7 @@
 		F113A685F6380F25DB1EAA0A /* ExerciseEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2E0E2B069D653E11B711F94 /* ExerciseEntry.swift */; };
 		F4D7834334DAB487708F1E7A /* SessionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 954781C58DB0B28999A9C41E /* SessionServiceTests.swift */; };
 		FA9A2FB251E0708544D3E2EC /* Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D4B4C15D7903D4D2EB1879A /* Backup.swift */; };
+		FB22A188BB6655C79A3A4D02 /* LegacyDataBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01CED3F9B65EE864B80B9662 /* LegacyDataBackfill.swift */; };
 		FE55321EB9475A2EC2CC7772 /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AA7574924692C654DA530E5 /* AppShellView.swift */; };
 /* End PBXBuildFile section */
 
@@ -58,6 +60,7 @@
 
 /* Begin PBXFileReference section */
 		01CB85E9030E4074F6C47563 /* FitCoachApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitCoachApp.swift; sourceTree = "<group>"; };
+		01CED3F9B65EE864B80B9662 /* LegacyDataBackfill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyDataBackfill.swift; sourceTree = "<group>"; };
 		0343357B014518A3ADFF6179 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		07A721E7F964AA9414BFF492 /* FitCoachUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FitCoachUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0B1D07567FC46E6C33EB91BA /* WorkoutSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSession.swift; sourceTree = "<group>"; };
@@ -68,6 +71,7 @@
 		40FFE2E29414939F2B219251 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		47B4B04863232260F7BB41B4 /* BackupV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupV2Tests.swift; sourceTree = "<group>"; };
 		4BB996ACA965F1175244FB2A /* StudentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudentDetailView.swift; sourceTree = "<group>"; };
+		5990F5C9AF133D37AE09CFDA /* SessionHistoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionHistoryDetailView.swift; sourceTree = "<group>"; };
 		6C795B00D06F6D1CC952B1B5 /* StudentListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudentListView.swift; sourceTree = "<group>"; };
 		7146554FFA44037944715C42 /* MeasurementTrendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementTrendView.swift; sourceTree = "<group>"; };
 		79DE340BBCECA4A9C45FE9AE /* FitCoach.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FitCoach.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -96,6 +100,7 @@
 		01C1B921C508E2C289DAC52F /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				01CED3F9B65EE864B80B9662 /* LegacyDataBackfill.swift */,
 				86CDE22294BD22F279E1F24A /* SessionService.swift */,
 			);
 			path = Services;
@@ -166,6 +171,7 @@
 				7146554FFA44037944715C42 /* MeasurementTrendView.swift */,
 				A028AE5A7411E17636C43FB6 /* OnboardingView.swift */,
 				D147E83C60381FCF1968FCC6 /* RootView.swift */,
+				5990F5C9AF133D37AE09CFDA /* SessionHistoryDetailView.swift */,
 				0343357B014518A3ADFF6179 /* SettingsView.swift */,
 				4BB996ACA965F1175244FB2A /* StudentDetailView.swift */,
 				6C795B00D06F6D1CC952B1B5 /* StudentListView.swift */,
@@ -343,10 +349,12 @@
 				31B98CAA59DF5B0F6692B0F0 /* EditStudentView.swift in Sources */,
 				F113A685F6380F25DB1EAA0A /* ExerciseEntry.swift in Sources */,
 				463CA3A631E7C1DBEE2A7FB8 /* FitCoachApp.swift in Sources */,
+				FB22A188BB6655C79A3A4D02 /* LegacyDataBackfill.swift in Sources */,
 				01224D2762F7E34ABCD8F997 /* Localization.swift in Sources */,
 				459207BC5BE5ACB5E72B0D02 /* MeasurementTrendView.swift in Sources */,
 				6560E3B5E5481BF9606E10B2 /* OnboardingView.swift in Sources */,
 				D118F40B614877B65EDF3AA8 /* RootView.swift in Sources */,
+				8F8D757184207745E58EB5E1 /* SessionHistoryDetailView.swift in Sources */,
 				532E1669864DAC0D87922E52 /* SessionService.swift in Sources */,
 				496DEDC97928646D4A62722E /* SettingsView.swift in Sources */,
 				247D87F1107CED8D9C43EB7F /* Student.swift in Sources */,

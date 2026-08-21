@@ -119,7 +119,17 @@ func insertBackupStudent(_ backup: StudentBackup, into context: ModelContext) {
     context.insert(student)
 
     for sessionBackup in backup.workoutSessions {
-        let session = WorkoutSession(date: sessionBackup.date, title: sessionBackup.title)
+        let isCompleted = sessionBackup.exercises.contains(where: \.isCompleted)
+        let session = WorkoutSession(
+            date: sessionBackup.date,
+            title: sessionBackup.title,
+            status: isCompleted ? .completed : .planned,
+            consumesCredit: backup.totalPurchasedSessions != nil
+        )
+        if isCompleted {
+            session.startedAt = sessionBackup.date
+            session.completedAt = sessionBackup.date
+        }
         session.student = student
         context.insert(session)
 
@@ -142,6 +152,46 @@ func insertBackupStudent(_ backup: StudentBackup, into context: ModelContext) {
             exercise.isCompleted = exerciseBackup.isCompleted
             exercise.session = session
             context.insert(exercise)
+
+            if category != .cardio {
+                for index in 0..<max(exerciseBackup.plannedSets, exerciseBackup.actualSets) {
+                    let set = WorkoutSet(
+                        sortIndex: index,
+                        plannedReps: exerciseBackup.plannedReps,
+                        actualReps: index < exerciseBackup.actualSets ? exerciseBackup.actualReps : nil,
+                        isCompleted: index < exerciseBackup.actualSets && exerciseBackup.isCompleted,
+                        completedAt: index < exerciseBackup.actualSets && exerciseBackup.isCompleted ? sessionBackup.date : nil
+                    )
+                    set.exercise = exercise
+                    context.insert(set)
+                }
+            }
+        }
+    }
+
+    if let total = backup.totalPurchasedSessions {
+        let opening = CreditTransaction(
+            idempotencyKey: "student:\(student.id.uuidString):opening",
+            amount: total,
+            kind: .openingBalance,
+            occurredAt: student.createdDate,
+            note: "旧版备份课时"
+        )
+        opening.student = student
+        context.insert(opening)
+
+        for session in student.workoutSessions where session.status == .completed {
+            let debit = CreditTransaction(
+                idempotencyKey: "session:\(session.id.uuidString):legacy-consume",
+                amount: -1,
+                kind: .consume,
+                occurredAt: session.completedAt ?? session.date,
+                note: "旧版备份课程",
+                sessionIDSnapshot: session.id
+            )
+            debit.student = student
+            debit.session = session
+            context.insert(debit)
         }
     }
 }

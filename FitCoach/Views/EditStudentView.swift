@@ -7,6 +7,7 @@ struct EditStudentView: View {
     @Bindable var student: Student
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var loc: LocalizationManager
+    @Environment(\.modelContext) private var modelContext
 
     @State private var fitnessLevel: FitnessLevel
     @State private var weightKg: Double
@@ -18,6 +19,7 @@ struct EditStudentView: View {
     @State private var fitnessGoal: String
     @State private var notes: String
     @State private var totalPurchasedSessionsText: String
+    @State private var errorMessage: String?
 
     init(student: Student) {
         self.student = student
@@ -115,15 +117,14 @@ struct EditStudentView: View {
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 100)
                         }
-                        if let total = Int(totalPurchasedSessionsText) {
-                            let remaining = max(0, total - student.workoutSessions.count)
-                            LabeledContent(loc.t("剩余课时"), value: "\(remaining) / \(total)")
+                        if let remaining = student.remainingSessions {
+                            LabeledContent(loc.t("剩余课时"), value: "\(remaining) 节")
                                 .foregroundStyle(.secondary)
                         }
                     } header: {
                         Text(loc.t("课时包"))
                     } footer: {
-                        Text(loc.t("续费后把总课时数改大即可，剩余课时会自动按已记录的训练次数重新计算。"))
+                        Text("增加总课时会写入一笔续费流水；减少则记录为人工调整，余额不会被静默重算。")
                     }
                 }
 
@@ -147,6 +148,14 @@ struct EditStudentView: View {
                     Button(loc.t("完成")) { save() }
                 }
             }
+            .alert("保存失败", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("好", role: .cancel) { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "请稍后重试")
+            }
         }
     }
 
@@ -160,8 +169,17 @@ struct EditStudentView: View {
         student.waistCm = Double(waistCm)
         student.fitnessGoal = fitnessGoal
         student.notes = notes
-        student.totalPurchasedSessions = Int(totalPurchasedSessionsText)
-        dismiss()
+        do {
+            if let newTotal = Int(totalPurchasedSessionsText) {
+                try SessionService(context: modelContext).adjustPurchasedCredits(for: student, newTotal: newTotal)
+            } else {
+                try modelContext.save()
+            }
+            dismiss()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
+        }
     }
 }
 

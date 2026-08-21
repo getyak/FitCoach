@@ -10,6 +10,9 @@ struct RootView: View {
     var body: some View {
         AppShellView()
             .task {
+                if !ProcessInfo.processInfo.arguments.contains("-uiTesting") {
+                    try? LegacyDataBackfill.run(in: modelContext)
+                }
                 DemoDataSeeder.prepareIfNeeded(in: modelContext)
             }
     }

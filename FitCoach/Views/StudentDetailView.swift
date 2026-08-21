@@ -5,6 +5,7 @@ struct StudentDetailView: View {
     @Bindable var student: Student
     @Environment(\.modelContext) private var modelContext
     @State private var showingAddSession = false
+    @State private var startNewSessionImmediately = false
     @State private var showingEditStudent = false
     @State private var showingTrend = false
     @State private var activeSession: WorkoutSession?
@@ -31,7 +32,7 @@ struct StudentDetailView: View {
         .navigationTitle(student.name)
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: WorkoutSession.self) { session in
-            WorkoutSessionDetailView(session: session)
+            SessionHistoryDetailView(session: session)
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -39,7 +40,11 @@ struct StudentDetailView: View {
                     .minimumTapTarget()
             }
         }
-        .sheet(isPresented: $showingAddSession) { AddWorkoutSessionView(student: student) }
+        .sheet(isPresented: $showingAddSession) {
+            AddWorkoutSessionView(student: student, startImmediately: startNewSessionImmediately) { session in
+                if startNewSessionImmediately { activeSession = session }
+            }
+        }
         .sheet(isPresented: $showingEditStudent) { EditStudentView(student: student) }
         .sheet(isPresented: $showingTrend) {
             NavigationStack { MeasurementTrendView(student: student) }
@@ -75,7 +80,10 @@ struct StudentDetailView: View {
                 }
                 .buttonStyle(PrimaryActionButtonStyle())
                 .accessibilityIdentifier("client.startWorkout")
-                Button("新建不同训练计划", systemImage: "plus") { showingAddSession = true }
+                Button("新建不同训练计划", systemImage: "plus") {
+                    startNewSessionImmediately = false
+                    showingAddSession = true
+                }
                     .buttonStyle(.bordered)
                     .controlSize(.large)
             }
@@ -160,6 +168,7 @@ struct StudentDetailView: View {
             return
         }
         guard let lastCompleted else {
+            startNewSessionImmediately = true
             showingAddSession = true
             return
         }

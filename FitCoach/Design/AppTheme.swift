@@ -26,6 +26,7 @@ struct AppCard<Content: View>: View {
 
 struct PrimaryActionButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -38,9 +39,9 @@ struct PrimaryActionButtonStyle: ButtonStyle {
                 isEnabled ? AppTheme.brand : Color.secondary.opacity(0.35),
                 in: Capsule()
             )
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.98 : 1))
             .opacity(configuration.isPressed ? 0.9 : 1)
-            .animation(.spring(response: 0.28, dampingFraction: 0.82), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.82), value: configuration.isPressed)
     }
 }
 

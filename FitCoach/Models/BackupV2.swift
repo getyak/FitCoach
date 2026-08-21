@@ -108,6 +108,11 @@ struct ExerciseBackupV2: Codable {
     var plannedDurationMinutes: Double
     var notes: String
     var targetRPE: Double?
+    var actualSets: Int?
+    var actualReps: Int?
+    var actualRestSeconds: Int?
+    var actualDurationMinutes: Double?
+    var isCompleted: Bool?
     var sets: [SetBackupV2]
 
     init(_ exercise: ExerciseEntry) {
@@ -122,6 +127,11 @@ struct ExerciseBackupV2: Codable {
         plannedDurationMinutes = exercise.plannedDurationMinutes
         notes = exercise.notes
         targetRPE = exercise.targetRPE
+        actualSets = exercise.actualSets
+        actualReps = exercise.actualReps
+        actualRestSeconds = exercise.actualRestSeconds
+        actualDurationMinutes = exercise.actualDurationMinutes
+        isCompleted = exercise.isCompleted
         sets = exercise.sortedSets.map(SetBackupV2.init)
     }
 }
@@ -265,44 +275,56 @@ enum BackupV2Service {
     }
 
     static func insert(_ archive: BackupArchiveV2, into context: ModelContext) throws -> BackupImportResult {
-        let existingStudentIDs = Set(try context.fetch(FetchDescriptor<Student>()).map(\.id))
-        let existingTemplateIDs = Set(try context.fetch(FetchDescriptor<WorkoutTemplate>()).map(\.id))
+        var studentsByID = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<Student>()).map { ($0.id, $0) })
+        var sessionsByID = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<WorkoutSession>()).map { ($0.id, $0) })
+        var measurementIDs = Set(try context.fetch(FetchDescriptor<BodyMeasurement>()).map(\.id))
+        var creditIDs = Set(try context.fetch(FetchDescriptor<CreditTransaction>()).map(\.id))
+        var creditKeys = Set(try context.fetch(FetchDescriptor<CreditTransaction>()).map(\.idempotencyKey))
+        var templatesByID = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<WorkoutTemplate>()).map { ($0.id, $0) })
+        var templateExerciseIDs = Set(try context.fetch(FetchDescriptor<TemplateExercise>()).map(\.id))
         var imported = 0
         var skipped = 0
         var importedStudents: [UUID: Student] = [:]
-        var importedSessions: [UUID: WorkoutSession] = [:]
+        var importedSessions = sessionsByID
 
         for backup in archive.students {
-            guard !existingStudentIDs.contains(backup.id) else { skipped += 1; continue }
-            let student = Student(
-                name: backup.name,
-                gender: Gender(rawValue: backup.gender) ?? .other,
-                age: backup.age,
-                fitnessLevel: FitnessLevel(rawValue: backup.fitnessLevel) ?? .beginner,
-                weightKg: backup.weightKg,
-                heightCm: backup.heightCm,
-                bodyFatPercentage: backup.bodyFatPercentage,
-                hipCm: backup.hipCm,
-                chestCm: backup.chestCm,
-                waistCm: backup.waistCm,
-                fitnessGoal: backup.fitnessGoal,
-                notes: backup.notes,
-                safetyNotes: backup.safetyNotes,
-                isOwner: backup.isOwner,
-                totalPurchasedSessions: backup.totalPurchasedSessions
-            )
-            student.id = backup.id
-            student.createdDate = backup.createdDate
-            context.insert(student)
+            let student: Student
+            if let existing = studentsByID[backup.id] {
+                student = existing
+                skipped += 1
+            } else {
+                student = Student(
+                    name: backup.name,
+                    gender: Gender(rawValue: backup.gender) ?? .other,
+                    age: backup.age,
+                    fitnessLevel: FitnessLevel(rawValue: backup.fitnessLevel) ?? .beginner,
+                    weightKg: backup.weightKg,
+                    heightCm: backup.heightCm,
+                    bodyFatPercentage: backup.bodyFatPercentage,
+                    hipCm: backup.hipCm,
+                    chestCm: backup.chestCm,
+                    waistCm: backup.waistCm,
+                    fitnessGoal: backup.fitnessGoal,
+                    notes: backup.notes,
+                    safetyNotes: backup.safetyNotes,
+                    isOwner: backup.isOwner,
+                    totalPurchasedSessions: backup.totalPurchasedSessions
+                )
+                student.id = backup.id
+                student.createdDate = backup.createdDate
+                context.insert(student)
+                studentsByID[student.id] = student
+                imported += 1
+            }
             importedStudents[student.id] = student
-            imported += 1
 
-            for item in backup.measurements {
+            for item in backup.measurements where !measurementIDs.contains(item.id) {
                 let measurement = BodyMeasurement(id: item.id, measuredAt: item.measuredAt, weightKg: item.weightKg, bodyFatPercentage: item.bodyFatPercentage, hipCm: item.hipCm, chestCm: item.chestCm, waistCm: item.waistCm, notes: item.notes)
                 measurement.student = student
                 context.insert(measurement)
+                measurementIDs.insert(item.id)
             }
-            for item in backup.sessions {
+            for item in backup.sessions where sessionsByID[item.id] == nil {
                 let session = WorkoutSession(date: item.date, title: item.title, status: item.statusCode.flatMap(WorkoutSessionStatus.init(rawValue:)) ?? .planned, consumesCredit: item.consumesCredit)
                 session.id = item.id
                 session.startedAt = item.startedAt
@@ -316,25 +338,35 @@ enum BackupV2Service {
                 session.student = student
                 context.insert(session)
                 importedSessions[session.id] = session
+                sessionsByID[session.id] = session
                 insertExercises(item.exercises, into: session, context: context)
             }
-            for item in backup.credits {
+            for item in backup.credits where !creditIDs.contains(item.id) && !creditKeys.contains(item.idempotencyKey) {
                 let credit = CreditTransaction(id: item.id, idempotencyKey: item.idempotencyKey, amount: item.amount, kind: CreditTransactionKind(rawValue: item.kindCode) ?? .adjustment, occurredAt: item.occurredAt, note: item.note, sessionIDSnapshot: item.sessionIDSnapshot, reversesTransactionID: item.reversesTransactionID)
                 credit.student = student
                 credit.session = item.sessionIDSnapshot.flatMap { importedSessions[$0] }
                 context.insert(credit)
+                creditIDs.insert(item.id)
+                creditKeys.insert(item.idempotencyKey)
             }
         }
 
-        for item in archive.templates where !existingTemplateIDs.contains(item.id) {
-            let template = WorkoutTemplate(id: item.id, name: item.name, createdAt: item.createdAt)
-            template.updatedAt = item.updatedAt
-            template.student = item.studentID.flatMap { importedStudents[$0] }
-            context.insert(template)
-            for exerciseItem in item.exercises {
+        for item in archive.templates {
+            let template: WorkoutTemplate
+            if let existing = templatesByID[item.id] {
+                template = existing
+            } else {
+                template = WorkoutTemplate(id: item.id, name: item.name, createdAt: item.createdAt)
+                template.updatedAt = item.updatedAt
+                template.student = item.studentID.flatMap { importedStudents[$0] ?? studentsByID[$0] }
+                context.insert(template)
+                templatesByID[item.id] = template
+            }
+            for exerciseItem in item.exercises where !templateExerciseIDs.contains(exerciseItem.id) {
                 let exercise = TemplateExercise(id: exerciseItem.id, sortIndex: exerciseItem.sortIndex, name: exerciseItem.name, category: ExerciseCategory(rawValue: exerciseItem.categoryCode) ?? .strength, setsCount: exerciseItem.setsCount, reps: exerciseItem.reps, weightKg: exerciseItem.weightKg, restSeconds: exerciseItem.restSeconds, targetRPE: exerciseItem.targetRPE, durationMinutes: exerciseItem.durationMinutes)
                 exercise.template = template
                 context.insert(exercise)
+                templateExerciseIDs.insert(exerciseItem.id)
             }
         }
 
@@ -353,6 +385,11 @@ enum BackupV2Service {
             exercise.id = item.id
             exercise.notes = item.notes
             exercise.targetRPE = item.targetRPE
+            exercise.actualSets = item.actualSets ?? 0
+            exercise.actualReps = item.actualReps ?? 0
+            exercise.actualRestSeconds = item.actualRestSeconds ?? 0
+            exercise.actualDurationMinutes = item.actualDurationMinutes ?? 0
+            exercise.isCompleted = item.isCompleted ?? false
             exercise.session = session
             context.insert(exercise)
             for setItem in item.sets {

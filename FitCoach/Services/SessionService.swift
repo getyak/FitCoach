@@ -4,12 +4,14 @@ import SwiftData
 enum SessionServiceError: LocalizedError, Equatable {
     case missingStudent
     case noExercises
+    case noCompletedWork
     case saveFailed
 
     var errorDescription: String? {
         switch self {
         case .missingStudent: return "课程没有关联学员"
         case .noExercises: return "训练中还没有动作"
+        case .noCompletedWork: return "请至少完成一组后再结束训练"
         case .saveFailed: return "数据保存失败，请重试"
         }
     }
@@ -90,7 +92,12 @@ struct SessionService {
     @discardableResult
     func startFromTemplate(_ template: WorkoutTemplate, for student: Student) throws -> WorkoutSession {
         let startedAt = now()
-        let session = WorkoutSession(date: startedAt, title: template.name, status: .inProgress)
+        let session = WorkoutSession(
+            date: startedAt,
+            title: template.name,
+            status: .inProgress,
+            consumesCredit: student.tracksCredits
+        )
         session.startedAt = startedAt
         session.student = student
         context.insert(session)
@@ -148,6 +155,9 @@ struct SessionService {
     func complete(_ session: WorkoutSession, editedSummary: String? = nil) throws {
         guard session.status != .completed else { return }
         guard !session.exercises.isEmpty else { throw SessionServiceError.noExercises }
+        guard session.completedSetCount > 0 || session.exercises.contains(where: \.isCompleted) else {
+            throw SessionServiceError.noCompletedWork
+        }
         guard let student = session.student else { throw SessionServiceError.missingStudent }
 
         let timestamp = now()
@@ -160,7 +170,7 @@ struct SessionService {
 
         ensureOpeningBalance(for: student, excluding: session)
 
-        if session.consumesCredit {
+        if session.consumesCredit && student.tracksCredits {
             let key = "session:\(session.id.uuidString):consume:\(session.completionEpoch)"
             if !student.creditTransactions.contains(where: { $0.idempotencyKey == key }) {
                 let transaction = CreditTransaction(
@@ -177,6 +187,16 @@ struct SessionService {
             }
         }
 
+        try save()
+    }
+
+    func start(_ session: WorkoutSession) throws {
+        guard session.status == .planned else { return }
+        let timestamp = now()
+        session.status = .inProgress
+        session.startedAt = timestamp
+        session.date = timestamp
+        session.updatedAt = timestamp
         try save()
     }
 
@@ -227,6 +247,48 @@ struct SessionService {
         )
         transaction.student = student
         context.insert(transaction)
+        try save()
+    }
+
+    /// 记录续费或人工调整，同时保留旧总课时字段用于兼容旧备份。
+    func adjustPurchasedCredits(for student: Student, newTotal: Int) throws {
+        let oldTotal = student.totalPurchasedSessions ?? 0
+        let difference = newTotal - oldTotal
+        student.totalPurchasedSessions = newTotal
+        guard difference != 0 else {
+            try save()
+            return
+        }
+
+        if student.creditTransactions.isEmpty {
+            let opening = CreditTransaction(
+                idempotencyKey: "student:\(student.id.uuidString):opening",
+                amount: newTotal,
+                kind: .openingBalance,
+                occurredAt: now(),
+                note: "初始课时"
+            )
+            opening.student = student
+            context.insert(opening)
+        } else {
+            let transaction = CreditTransaction(
+                idempotencyKey: "student:\(student.id.uuidString):credit-adjustment:\(UUID().uuidString)",
+                amount: difference,
+                kind: difference > 0 ? .purchase : .adjustment,
+                occurredAt: now(),
+                note: difference > 0 ? "续费 \(difference) 节" : "调整课时 \(difference) 节"
+            )
+            transaction.student = student
+            context.insert(transaction)
+        }
+        try save()
+    }
+
+    func cancel(_ session: WorkoutSession) throws {
+        guard session.status != .completed else { return }
+        session.status = .cancelled
+        session.restEndsAt = nil
+        session.updatedAt = now()
         try save()
     }
 
