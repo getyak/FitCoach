@@ -117,7 +117,11 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertEqual(rpe.value as? String, "未记录")
         tapAdjustment(on: weight, increment: true)
         tapAdjustment(on: reps, increment: false)
-        tapAdjustment(on: rpe, increment: true)
+        rpe.tap()
+        let rpeField = app.textFields["workout.directInput.field"]
+        XCTAssertTrue(rpeField.waitForExistence(timeout: 3))
+        rpeField.typeText("7.5")
+        app.buttons["workout.directInput.save"].tap()
 
         let note = app.textFields["第 1 组备注"]
         XCTAssertTrue(note.exists)
@@ -165,6 +169,83 @@ final class FitCoachSmokeUITests: XCTestCase {
         let restoredWeight = app.descendants(matching: .any)["workout.control.重量"].firstMatch
         XCTAssertTrue(restoredWeight.waitForExistence(timeout: 5))
         XCTAssertEqual(restoredWeight.value as? String, "22.5 千克")
+    }
+
+    func testDirectNumericInputSavesImmediatelyAndSurvivesRelaunch() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "-resetStore"]
+        app.launch()
+
+        let start = app.buttons["today.startWorkout"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+
+        let weight = app.descendants(matching: .any)["workout.control.重量"].firstMatch
+        XCTAssertTrue(weight.waitForExistence(timeout: 5))
+        weight.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55)).tap()
+
+        let field = app.textFields["workout.directInput.field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 3))
+        let clear = app.buttons["workout.directInput.clear"]
+        XCTAssertTrue(clear.isHittable)
+        clear.tap()
+        field.typeText("37.5")
+
+        let editorAttachment = XCTAttachment(screenshot: app.screenshot())
+        editorAttachment.name = "Direct-numeric-input"
+        editorAttachment.lifetime = .keepAlways
+        add(editorAttachment)
+
+        let save = app.buttons["workout.directInput.save"]
+        XCTAssertTrue(save.isHittable)
+        save.tap()
+        XCTAssertTrue(waitForValue("37.5 千克", on: weight, timeout: 3))
+
+        app.terminate()
+        app.launchArguments = ["-uiTesting"]
+        app.launch()
+        let resume = app.buttons["today.startWorkout"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 5))
+        resume.tap()
+
+        let restoredWeight = app.descendants(matching: .any)["workout.control.重量"].firstMatch
+        XCTAssertTrue(restoredWeight.waitForExistence(timeout: 5))
+        XCTAssertEqual(restoredWeight.value as? String, "37.5 千克")
+    }
+
+    func testWorkoutDeepLinkOpensExactSessionWarmAndCold() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "-resetStore", "-seedDeepLink"]
+        app.launch()
+
+        let url = URL(string: "fitcoach://workout/A1165A79-2B26-446E-AB9B-73D1495DB85E")!
+        XCTAssertTrue(app.buttons["today.startWorkout"].waitForExistence(timeout: 5))
+        app.open(url)
+        XCTAssertTrue(app.staticTexts["系统回课深蹲"].waitForExistence(timeout: 5))
+
+        let pause = app.buttons["workout.pause"]
+        XCTAssertTrue(pause.isHittable)
+        pause.tap()
+        XCTAssertTrue(app.buttons["today.startWorkout"].waitForExistence(timeout: 3))
+
+        app.terminate()
+        app.launchArguments = ["-uiTesting", "-seedDeepLink"]
+        app.open(url)
+        XCTAssertTrue(app.staticTexts["系统回课深蹲"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["workout.completeCurrentSet"].isHittable)
+    }
+
+    func testTodayAndWorkoutPassSystemAccessibilityAudit() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "-resetStore"]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["today.startWorkout"].waitForExistence(timeout: 5))
+        try auditAccessibility(in: app)
+
+        app.buttons["today.startWorkout"].tap()
+        XCTAssertTrue(app.buttons["workout.completeCurrentSet"].waitForExistence(timeout: 5))
+        try auditAccessibility(in: app)
     }
 
     func testTodayPrimaryActionRemainsReachableAtAccessibilityTextSize() {
@@ -229,9 +310,27 @@ final class FitCoachSmokeUITests: XCTestCase {
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
+    private func auditAccessibility(in app: XCUIApplication) throws {
+        try app.performAccessibilityAudit { issue in
+            print(
+                "AX_AUDIT | \(issue.auditType.rawValue) | \(issue.compactDescription) | "
+                + "\(issue.detailedDescription) | element=\(String(describing: issue.element))"
+            )
+            return false
+        }
+    }
+
     private func waitForLabelContaining(_ text: String, on element: XCUIElement, timeout: TimeInterval) -> Bool {
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label CONTAINS %@", text),
+            object: element
+        )
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func waitForValue(_ value: String, on element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", value),
             object: element
         )
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed

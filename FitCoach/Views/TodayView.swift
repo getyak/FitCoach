@@ -237,7 +237,7 @@ private struct FocusClientCard: View {
                             .font(.headline)
                         Text(previousSession.sortedExercises.prefix(3).map(\.name).joined(separator: " · "))
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppTheme.secondaryText)
                     }
                     .accessibilityElement(children: .combine)
                 }
@@ -252,7 +252,7 @@ private struct FocusClientCard: View {
                                 .font(.subheadline.weight(.semibold))
                             Text(student.safetyNotes)
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppTheme.secondaryText)
                         }
                     }
                     .padding(12)
@@ -273,24 +273,24 @@ private struct FocusClientCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(statusCaption)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(activeSession?.status == .inProgress ? AppTheme.success : AppTheme.brand)
+                        .foregroundStyle(AppTheme.secondaryText)
                     Text(student.name)
                         .font(.headline)
                         .accessibilityIdentifier("today.focusName")
                 }
             } else {
                 HStack(spacing: 12) {
-                    Text(String(student.name.prefix(1)))
-                        .font(.title2.bold())
+                    Image(systemName: "person.fill")
+                        .font(.title2.weight(.semibold))
                         .frame(width: 48, height: 48)
                         .foregroundStyle(.white)
-                        .background(AppTheme.brand, in: Circle())
+                        .background(AppTheme.primaryAction, in: Circle())
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(statusCaption)
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(activeSession?.status == .inProgress ? AppTheme.success : AppTheme.brand)
+                            .foregroundStyle(AppTheme.secondaryText)
                         Text(student.name)
                             .font(.title2.bold())
                             .accessibilityIdentifier("today.focusName")
@@ -342,7 +342,7 @@ private struct PreviousSessionSection: View {
                                 Text(exercise.name).font(.headline)
                                 Text(exercise.previousSummary)
                                     .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(AppTheme.secondaryText)
                             }
                             Spacer()
                             Image(systemName: "checkmark.circle.fill")
@@ -361,7 +361,7 @@ private struct PreviousSessionSection: View {
                     Spacer()
                     Text("\(session.completedSetCount) 组")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                 }
             }
             .tint(AppTheme.brand)
@@ -383,7 +383,7 @@ private struct EmptyTodayState: View {
                     .font(.title2.bold())
                 Text("之后每次打开，都能直接从学员上一次训练继续。")
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryText)
                 Button("添加学员", action: addClient)
                     .buttonStyle(PrimaryActionButtonStyle())
             }

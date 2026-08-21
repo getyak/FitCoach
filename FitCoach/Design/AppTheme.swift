@@ -6,12 +6,34 @@ enum AppTheme {
     static let cardRadius: CGFloat = 20
     static let controlHeight: CGFloat = 50
 
-    static let brand = Color.accentColor
+    /// Brand foreground adapts to the canvas. Keep it distinct from the
+    /// deeper action fill, which must retain sufficient contrast with white.
+    static let brand = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 1.00, green: 0.54, blue: 0.31, alpha: 1)
+            : UIColor(red: 0.76, green: 0.27, blue: 0.07, alpha: 1)
+    })
+    static let primaryAction = Color(
+        red: 0.76,
+        green: 0.27,
+        blue: 0.07
+    )
     static let surface = Color(uiColor: .secondarySystemGroupedBackground)
     static let elevatedSurface = Color(uiColor: .tertiarySystemGroupedBackground)
     static let canvas = Color(uiColor: .systemGroupedBackground)
-    static let success = Color(uiColor: .systemGreen)
-    static let warning = Color(uiColor: .systemOrange)
+    static let success = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.19, green: 0.82, blue: 0.35, alpha: 1)
+            : UIColor(red: 0.10, green: 0.48, blue: 0.20, alpha: 1)
+    })
+    static let warning = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 1.00, green: 0.62, blue: 0.04, alpha: 1)
+            : UIColor(red: 0.62, green: 0.31, blue: 0.00, alpha: 1)
+    })
+    /// Small supporting copy needs more contrast than the system secondary
+    /// label on grouped surfaces while remaining visually quieter than body text.
+    static let secondaryText = Color.primary.opacity(0.72)
 }
 
 struct AppCard<Content: View>: View {
@@ -36,7 +58,7 @@ struct PrimaryActionButtonStyle: ButtonStyle {
             .padding(.horizontal, 18)
             .foregroundStyle(Color.white)
             .background(
-                isEnabled ? AppTheme.brand : Color.secondary.opacity(0.35),
+                isEnabled ? AppTheme.primaryAction : Color.secondary.opacity(0.35),
                 in: Capsule()
             )
             .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.98 : 1))
@@ -97,7 +119,7 @@ struct MetricPill: View {
                     .accessibilityHidden(true)
             }
             Text(label)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
             Text(value)
                 .fontWeight(.semibold)
                 .monospacedDigit()

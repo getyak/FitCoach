@@ -13,7 +13,6 @@ struct ActiveWorkoutView: View {
     @State private var showingFinishConfirmation = false
     @State private var errorMessage: String?
     @State private var hapticTrigger = 0
-    @State private var pendingValueSave: Task<Void, Never>?
     @State private var pendingTextSave: Task<Void, Never>?
 
     init(session: WorkoutSession) {
@@ -64,7 +63,8 @@ struct ActiveWorkoutView: View {
                                         focusedSetID: focusedSetID,
                                         onFocusSet: { focus(on: $0.id) },
                                         onSetToggle: toggleSet,
-                                        onValueChange: saveValueDraftDebounced,
+                                        onValueChange: saveDraft,
+                                        onValueCommit: saveDraft,
                                         onTextChange: saveDraftDebounced
                                     )
                                     .id(currentExercise.id)
@@ -97,26 +97,13 @@ struct ActiveWorkoutView: View {
                         }
                     }
                     .background(AppTheme.canvas)
-                    .navigationTitle(session.student?.name ?? "训练中")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button { dismiss() } label: {
-                                Image(systemName: "pause.fill")
-                            }
-                                .minimumTapTarget()
-                                .accessibilityLabel("稍后继续")
-                                .accessibilityIdentifier("workout.pause")
-                        }
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Menu {
-                                Button("取消本节", systemImage: "xmark", role: .destructive) {
-                                    cancelSession()
-                                }
-                            } label: {
-                                Label("更多操作", systemImage: "ellipsis")
-                            }
-                        }
+                    .toolbar(.hidden, for: .navigationBar)
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        TrainingNavigationHeader(
+                            title: session.student?.name ?? "训练中",
+                            onPause: { dismiss() },
+                            onCancel: cancelSession
+                        )
                     }
                     .safeAreaInset(edge: .bottom) {
                         WorkoutBottomControls(
@@ -141,7 +128,6 @@ struct ActiveWorkoutView: View {
             await RestActivityService.reconcile(sessionID: session.id, restEndsAt: session.restEndsAt)
         }
         .onDisappear {
-            pendingValueSave?.cancel()
             pendingTextSave?.cancel()
             if modelContext.hasChanges { saveDraft() }
         }
@@ -268,18 +254,6 @@ struct ActiveWorkoutView: View {
         }
     }
 
-    /// Rapid +/- taps should feel immediate while collapsing several synchronous
-    /// SwiftData saves into one short, bounded persistence window.
-    private func saveValueDraftDebounced() {
-        session.updatedAt = Date()
-        pendingValueSave?.cancel()
-        pendingValueSave = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(180))
-            guard !Task.isCancelled else { return }
-            saveDraft()
-        }
-    }
-
     private func previousExercise() {
         guard currentExerciseIndex > 0 else { return }
         move(to: currentExerciseIndex - 1)
@@ -317,6 +291,47 @@ struct ActiveWorkoutView: View {
     }
 }
 
+private struct TrainingNavigationHeader: View {
+    let title: String
+    let onPause: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onPause) {
+                Image(systemName: "pause.fill")
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .minimumTapTarget()
+            .accessibilityLabel("稍后继续")
+            .accessibilityIdentifier("workout.pause")
+
+            Spacer(minLength: 8)
+
+            Text(title)
+                .font(.headline)
+                .lineLimit(1)
+
+            Spacer(minLength: 8)
+
+            Menu {
+                Button("取消本节", systemImage: "xmark", role: .destructive, action: onCancel)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .minimumTapTarget()
+            .accessibilityLabel("更多操作")
+        }
+        .foregroundStyle(.primary)
+        .padding(.horizontal, 16)
+        .frame(minHeight: 52)
+        .background(AppTheme.canvas)
+    }
+}
+
 private struct WorkoutProgressHeader: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let session: WorkoutSession
@@ -325,7 +340,7 @@ private struct WorkoutProgressHeader: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            VStack(spacing: 10) {
+            VStack(spacing: 6) {
                 Group {
                     if dynamicTypeSize.isAccessibilitySize {
                         VStack(alignment: .leading, spacing: 6) {
@@ -340,10 +355,6 @@ private struct WorkoutProgressHeader: View {
                         }
                     }
                 }
-                ProgressView(value: session.progress)
-                    .tint(AppTheme.brand)
-                    .accessibilityLabel("训练完成进度")
-                    .accessibilityValue("\(Int(session.progress * 100)) 百分比")
             }
         }
         .accessibilityElement(children: .contain)
@@ -366,7 +377,7 @@ private struct WorkoutProgressHeader: View {
     private var exerciseProgressLabel: some View {
         Text("动作 \(min(currentIndex + 1, max(1, totalExercises))) / \(max(1, totalExercises))")
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(AppTheme.secondaryText)
     }
 
     private func elapsedText(at date: Date) -> String {
@@ -378,11 +389,14 @@ private struct WorkoutProgressHeader: View {
 
 private struct ExerciseSetEditor: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+    @AccessibilityFocusState private var accessibilityFocusedSetID: UUID?
     let exercise: ExerciseEntry
     let focusedSetID: UUID?
     let onFocusSet: (WorkoutSet) -> Void
     let onSetToggle: (WorkoutSet, Int) -> Void
     let onValueChange: () -> Void
+    let onValueCommit: () -> Void
     let onTextChange: () -> Void
 
     var body: some View {
@@ -410,7 +424,7 @@ private struct ExerciseSetEditor: View {
                     }
                 }
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("workout.previousPerformance")
@@ -423,8 +437,10 @@ private struct ExerciseSetEditor: View {
                             WorkoutSetRow(
                                 set: set,
                                 onValueChange: onValueChange,
+                                onValueCommit: onValueCommit,
                                 onTextChange: onTextChange
                             )
+                            .accessibilityFocused($accessibilityFocusedSetID, equals: set.id)
                             .padding(.vertical, 8)
                             .transition(.opacity.combined(with: .scale(scale: 0.985)))
                         } else {
@@ -441,16 +457,30 @@ private struct ExerciseSetEditor: View {
 
             if exercise.sortedSets.isEmpty {
                 Text("这个动作还没有组记录")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryText)
             }
 
-            TextField("动作备注，例如：右膝感觉良好", text: Binding(
-                get: { exercise.notes },
-                set: { exercise.notes = $0; onTextChange() }
-            ), axis: .vertical)
-            .lineLimit(2...4)
-            .textFieldStyle(.roundedBorder)
-            .accessibilityLabel("动作备注")
+            VStack(alignment: .leading, spacing: 6) {
+                Text("动作备注（可选）")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.secondaryText)
+                TextField("", text: Binding(
+                    get: { exercise.notes },
+                    set: { exercise.notes = $0; onTextChange() }
+                ), axis: .vertical)
+                .lineLimit(2...4)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("动作备注")
+                .accessibilityHint("例如：右膝感觉良好")
+            }
+        }
+        .onChange(of: focusedSetID) { _, target in
+            guard voiceOverEnabled, let target else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                accessibilityFocusedSetID = target
+            }
         }
     }
 
@@ -475,7 +505,7 @@ private struct CompactWorkoutSetRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(set.isCompleted ? AppTheme.success : Color.secondary)
+                .foregroundStyle(set.isCompleted ? AppTheme.success : Color.primary)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
@@ -484,8 +514,8 @@ private struct CompactWorkoutSetRow: View {
                 Text(summary)
                     .font(.caption)
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .foregroundStyle(AppTheme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 8)
@@ -493,7 +523,7 @@ private struct CompactWorkoutSetRow: View {
             if set.isCompleted {
                 Button("撤销", action: onUndo)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryText)
                     .minimumTapTarget()
                     .accessibilityLabel("撤销第 \(set.sortIndex + 1) 组完成")
                     .accessibilityIdentifier("workout.set.\(set.sortIndex).complete")
@@ -501,6 +531,7 @@ private struct CompactWorkoutSetRow: View {
                 Button(action: onSelect) {
                     Label("编辑", systemImage: "chevron.right")
                         .labelStyle(.iconOnly)
+                        .foregroundStyle(.primary)
                 }
                 .minimumTapTarget()
                 .accessibilityLabel("编辑第 \(set.sortIndex + 1) 组")
@@ -511,9 +542,6 @@ private struct CompactWorkoutSetRow: View {
         .contentShape(Rectangle())
         .onTapGesture {
             if !set.isCompleted { onSelect() }
-        }
-        .overlay(alignment: .bottom) {
-            Divider().padding(.leading, 44)
         }
         .accessibilityElement(children: .contain)
     }
@@ -530,10 +558,11 @@ private struct CompactWorkoutSetRow: View {
 }
 
 private struct WorkoutSetRow: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Bindable var set: WorkoutSet
     @State private var valueHapticTrigger = 0
+    @State private var editingMetric: WorkoutMetric?
     let onValueChange: () -> Void
+    let onValueCommit: () -> Void
     let onTextChange: () -> Void
 
     var body: some View {
@@ -542,25 +571,36 @@ private struct WorkoutSetRow: View {
                 setNumber
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(spacing: 8) { valueControls }
-                } else {
-                    HStack(spacing: 8) { valueControls }
-                }
+                VStack(spacing: 8) { valueControls }
 
-                TextField("本组备注（可选）", text: Binding(
-                    get: { set.notes },
-                    set: { set.notes = $0; onTextChange() }
-                ))
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-                .accessibilityLabel("第 \(set.sortIndex + 1) 组备注")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("本组备注（可选）")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.secondaryText)
+                    TextField("", text: Binding(
+                        get: { set.notes },
+                        set: { set.notes = $0; onTextChange() }
+                    ))
+                    .textFieldStyle(.plain)
+                    .font(.subheadline)
+                    .accessibilityLabel("第 \(set.sortIndex + 1) 组备注")
+                }
             }
         }
         .opacity(set.isCompleted ? 0.78 : 1)
         .sensoryFeedback(.selection, trigger: valueHapticTrigger)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("workout.set.\(set.sortIndex).editor")
+        .sheet(item: $editingMetric) { metric in
+            NumericValueEditor(
+                metric: metric,
+                initialValue: directInputValue(for: metric),
+                onCommit: { applyDirectInput($0, for: metric) }
+            )
+            .presentationDetents([.height(270)])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Color(uiColor: .systemBackground))
+        }
     }
 
     private var setNumber: some View {
@@ -575,7 +615,8 @@ private struct WorkoutSetRow: View {
                         unit: "千克",
                         stepDescription: "2.5 千克",
                         decrease: { changeWeight(by: -2.5) },
-                        increase: { changeWeight(by: 2.5) }
+                        increase: { changeWeight(by: 2.5) },
+                        edit: { editingMetric = .weight }
                     )
                     SetValueControl(
                         label: "次数",
@@ -583,16 +624,25 @@ private struct WorkoutSetRow: View {
                         unit: "次",
                         stepDescription: "1 次",
                         decrease: { changeReps(by: -1) },
-                        increase: { changeReps(by: 1) }
+                        increase: { changeReps(by: 1) },
+                        edit: { editingMetric = .reps }
                     )
-                    SetValueControl(
-                        label: "RPE",
-                        value: set.rpe?.formatted() ?? "—",
-                        unit: "",
-                        stepDescription: "0.5",
-                        decrease: { changeRPE(by: -0.5) },
-                        increase: { changeRPE(by: 0.5) }
-                    )
+                    if let rpe = set.rpe {
+                        SetValueControl(
+                            label: "RPE",
+                            value: rpe.formatted(),
+                            unit: "",
+                            stepDescription: "0.5",
+                            decrease: { changeRPE(by: -0.5) },
+                            increase: { changeRPE(by: 0.5) },
+                            edit: { editingMetric = .rpe }
+                        )
+                    } else {
+                        UnsetMetricControl(
+                            label: "RPE",
+                            edit: { editingMetric = .rpe }
+                        )
+                    }
     }
 
     private var weightText: String {
@@ -617,11 +667,146 @@ private struct WorkoutSetRow: View {
     private func changeRPE(by amount: Double) {
         if let current = set.rpe {
             set.rpe = min(10, max(1, current + amount))
-        } else {
-            set.rpe = amount > 0 ? 7.5 : 6.5
         }
         valueHapticTrigger += 1
         onValueChange()
+    }
+
+    private func directInputValue(for metric: WorkoutMetric) -> Double? {
+        switch metric {
+        case .weight:
+            return set.actualWeightKg ?? set.plannedWeightKg
+        case .reps:
+            return Double(set.actualReps ?? set.plannedReps ?? 0)
+        case .rpe:
+            return set.rpe
+        }
+    }
+
+    private func applyDirectInput(_ value: Double, for metric: WorkoutMetric) {
+        switch metric {
+        case .weight:
+            set.actualWeightKg = max(0, value)
+        case .reps:
+            set.actualReps = max(0, Int(value.rounded()))
+        case .rpe:
+            set.rpe = min(10, max(1, value))
+        }
+        valueHapticTrigger += 1
+        onValueCommit()
+    }
+}
+
+private enum WorkoutMetric: String, Identifiable {
+    case weight
+    case reps
+    case rpe
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .weight: "重量"
+        case .reps: "次数"
+        case .rpe: "RPE"
+        }
+    }
+
+    var unit: String {
+        switch self {
+        case .weight: "kg"
+        case .reps: "次"
+        case .rpe: ""
+        }
+    }
+
+    var allowsDecimal: Bool { self != .reps }
+
+    func normalized(_ value: Double) -> Double {
+        switch self {
+        case .weight: max(0, value)
+        case .reps: max(0, value.rounded())
+        case .rpe: min(10, max(1, value))
+        }
+    }
+}
+
+private struct NumericValueEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var isFocused: Bool
+    @State private var text: String
+
+    let metric: WorkoutMetric
+    let onCommit: (Double) -> Void
+
+    init(metric: WorkoutMetric, initialValue: Double?, onCommit: @escaping (Double) -> Void) {
+        self.metric = metric
+        self.onCommit = onCommit
+        _text = State(initialValue: initialValue.map { $0.formatted() } ?? "")
+    }
+
+    private var parsedValue: Double? {
+        Double(text.replacingOccurrences(of: ",", with: "."))
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 22) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    TextField("0", text: $text)
+                        .font(.system(size: 42, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .multilineTextAlignment(.center)
+                        .keyboardType(metric.allowsDecimal ? .decimalPad : .numberPad)
+                        .focused($isFocused)
+                        .accessibilityLabel(metric.title)
+                        .accessibilityIdentifier("workout.directInput.field")
+
+                    if !metric.unit.isEmpty {
+                        Text(metric.unit)
+                            .font(.headline)
+                            .foregroundStyle(AppTheme.secondaryText)
+                    }
+
+                    if !text.isEmpty {
+                        Button {
+                            text = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.primary)
+                        }
+                        .minimumTapTarget()
+                        .accessibilityLabel("清除当前数值")
+                        .accessibilityIdentifier("workout.directInput.clear")
+                    }
+                }
+                .padding(.horizontal, 24)
+
+                Button {
+                    guard let parsedValue else { return }
+                    onCommit(metric.normalized(parsedValue))
+                    dismiss()
+                } label: {
+                    Text("确认")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 48)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppTheme.primaryAction)
+                .disabled(parsedValue == nil)
+                .accessibilityIdentifier("workout.directInput.save")
+            }
+            .padding(20)
+            .navigationTitle(metric.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+            }
+        }
+        .task { isFocused = true }
     }
 }
 
@@ -632,16 +817,18 @@ private struct SetValueControl: View {
     let stepDescription: String
     let decrease: () -> Void
     let increase: () -> Void
+    let edit: () -> Void
 
     var body: some View {
         VStack(spacing: 5) {
             Text(label)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
             ZStack {
                 HStack(spacing: 0) {
                     Button(action: decrease) {
                         Image(systemName: "minus")
+                            .foregroundStyle(.primary)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     .minimumTapTarget()
@@ -649,16 +836,22 @@ private struct SetValueControl: View {
 
                     Button(action: increase) {
                         Image(systemName: "plus")
+                            .foregroundStyle(.primary)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     .minimumTapTarget()
                     .buttonRepeatBehavior(.enabled)
                 }
 
-                Text(value)
-                    .font(.subheadline.weight(.semibold))
-                    .monospacedDigit()
-                    .allowsHitTesting(false)
+                Button(action: edit) {
+                    Text(value)
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                        .padding(.horizontal, 8)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
             .frame(height: 44)
             .background(AppTheme.elevatedSurface, in: Capsule())
@@ -675,12 +868,40 @@ private struct SetValueControl: View {
             @unknown default: break
             }
         }
+        .accessibilityAction(named: "直接输入") { edit() }
         .accessibilityIdentifier("workout.control.\(label)")
     }
 
     private var accessibilityValue: String {
-        guard value != "—" else { return "未记录" }
         return unit.isEmpty ? value : "\(value) \(unit)"
+    }
+}
+
+private struct UnsetMetricControl: View {
+    let label: String
+    let edit: () -> Void
+
+    var body: some View {
+        VStack(spacing: 5) {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppTheme.secondaryText)
+                .accessibilityHidden(true)
+            Button(action: edit) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(AppTheme.elevatedSurface, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(label)
+            .accessibilityValue("未记录")
+            .accessibilityHint("点按直接输入")
+            .accessibilityIdentifier("workout.control.\(label)")
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -702,13 +923,19 @@ private struct WorkoutBottomControls: View {
                 CompactRestStatus(endDate: restEndsAt, onSkip: onSkipRest)
             } else {
                 HStack(spacing: 10) {
-                    Button(action: onPrevious) {
-                        Image(systemName: "chevron.left")
-                            .frame(width: 44, height: 44)
+                    Group {
+                        if canGoPrevious {
+                            Button(action: onPrevious) {
+                                Image(systemName: "chevron.left")
+                                    .frame(width: 44, height: 44)
+                            }
+                            .accessibilityLabel("上一个动作")
+                        } else {
+                            Color.clear
+                                .frame(width: 44, height: 44)
+                                .accessibilityHidden(true)
+                        }
                     }
-                    .disabled(!canGoPrevious)
-                    .opacity(canGoPrevious ? 1 : 0.35)
-                    .accessibilityLabel("上一个动作")
 
                     Button(action: primaryAction) {
                         Group {
@@ -724,8 +951,7 @@ private struct WorkoutBottomControls: View {
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 50)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(AppTheme.brand)
+                    .buttonStyle(PrimaryActionButtonStyle())
                     .accessibilityLabel(primaryTitle)
                     .accessibilityIdentifier(primaryIdentifier)
                 }

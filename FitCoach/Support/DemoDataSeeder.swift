@@ -13,7 +13,10 @@ enum DemoDataSeeder {
 
         let students = try context.fetch(FetchDescriptor<Student>())
         guard students.isEmpty else { return }
-        try seedTodayScenario(in: context)
+        try seedTodayScenario(
+            in: context,
+            includesDeepLinkSession: arguments.contains("-seedDeepLink")
+        )
     }
 
     private static func reset(_ context: ModelContext) throws {
@@ -33,7 +36,10 @@ enum DemoDataSeeder {
         objects.forEach(context.delete)
     }
 
-    private static func seedTodayScenario(in context: ModelContext) throws {
+    private static func seedTodayScenario(
+        in context: ModelContext,
+        includesDeepLinkSession: Bool
+    ) throws {
         let calendar = Calendar(identifier: .gregorian)
         let now = Date()
         let student = Student(
@@ -133,7 +139,46 @@ enum DemoDataSeeder {
             context.insert(measurement)
         }
 
+        if includesDeepLinkSession {
+            seedDeepLinkSession(for: student, at: now, in: context)
+        }
+
         try context.save()
+    }
+
+    private static func seedDeepLinkSession(
+        for student: Student,
+        at date: Date,
+        in context: ModelContext
+    ) {
+        let session = WorkoutSession(date: date, title: "系统回课验证", status: .inProgress)
+        session.id = UUID(uuidString: "A1165A79-2B26-446E-AB9B-73D1495DB85E")!
+        session.startedAt = date
+        session.student = student
+        context.insert(session)
+
+        let exercise = ExerciseEntry(
+            name: "系统回课深蹲",
+            category: .strength,
+            sortIndex: 0,
+            plannedSets: 1,
+            plannedReps: 8,
+            plannedRestSeconds: 60,
+            plannedDurationMinutes: 8
+        )
+        exercise.targetRPE = 7
+        exercise.session = session
+        context.insert(exercise)
+
+        let set = WorkoutSet(
+            sortIndex: 0,
+            plannedWeightKg: 25,
+            plannedReps: 8,
+            actualWeightKg: 25,
+            actualReps: 8
+        )
+        set.exercise = exercise
+        context.insert(set)
     }
 
     private static func addExercise(
