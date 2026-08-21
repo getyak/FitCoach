@@ -201,8 +201,11 @@ struct ProfileView: View {
                     .foregroundStyle(.secondary)
                 Toggle("休息结束提醒", isOn: $restNotificationsEnabled)
                     .onChange(of: restNotificationsEnabled) { _, enabled in
-                        guard enabled else { return }
                         Task {
+                            guard enabled else {
+                                await RestNotificationService.cancelAll()
+                                return
+                            }
                             let granted = await RestNotificationService.requestAuthorization()
                             if !granted {
                                 restNotificationsEnabled = false

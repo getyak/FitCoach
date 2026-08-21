@@ -36,6 +36,14 @@ enum RestNotificationService {
         )
     }
 
+    static func cancelAll() async {
+        let center = UNUserNotificationCenter.current()
+        let identifiers = await center.pendingNotificationRequests()
+            .map(\.identifier)
+            .filter { $0.hasPrefix("rest:") }
+        center.removePendingNotificationRequests(withIdentifiers: identifiers)
+    }
+
     private static func identifier(for sessionID: UUID) -> String {
         "rest:\(sessionID.uuidString)"
     }
