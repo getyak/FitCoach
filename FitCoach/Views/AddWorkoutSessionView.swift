@@ -66,11 +66,12 @@ struct AddWorkoutSessionView: View {
         session.student = student
         modelContext.insert(session)
 
-        for draft in plannedExercises {
+        for (exerciseIndex, draft) in plannedExercises.enumerated() {
             let entry = ExerciseEntry(
                 name: draft.name,
                 category: draft.category,
                 cardioIntensity: draft.cardioIntensity,
+                sortIndex: exerciseIndex,
                 plannedSets: draft.plannedSets,
                 plannedReps: draft.plannedReps,
                 plannedRestSeconds: draft.plannedRestSeconds,
@@ -78,8 +79,25 @@ struct AddWorkoutSessionView: View {
             )
             entry.session = session
             modelContext.insert(entry)
+
+            if draft.category != .cardio {
+                for setIndex in 0..<draft.plannedSets {
+                    let set = WorkoutSet(
+                        sortIndex: setIndex,
+                        plannedReps: draft.plannedReps,
+                        actualReps: draft.plannedReps
+                    )
+                    set.exercise = entry
+                    modelContext.insert(set)
+                }
+            }
         }
-        dismiss()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            modelContext.rollback()
+        }
     }
 
     private func draftSummary(_ draft: PlannedExerciseDraft) -> String {

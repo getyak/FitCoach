@@ -18,6 +18,10 @@ struct AddStudentView: View {
     @State private var waistCm = ""
     @State private var fitnessGoal = ""
     @State private var notes = ""
+    @State private var safetyNotes = ""
+    @State private var purchasedSessions = 10
+    @State private var tracksCredits = true
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -93,6 +97,18 @@ struct AddStudentView: View {
                         .lineLimit(2...4)
                 }
 
+                Section("课时") {
+                    Toggle("追踪剩余课时", isOn: $tracksCredits)
+                    if tracksCredits {
+                        Stepper("初始课时：\(purchasedSessions) 节", value: $purchasedSessions, in: 0...200)
+                    }
+                }
+
+                Section("训练提醒") {
+                    TextField("伤病、动作限制或需要先确认的情况", text: $safetyNotes, axis: .vertical)
+                        .lineLimit(2...4)
+                }
+
                 Section(loc.t("备注")) {
                     TextField(loc.t("其他需要记录的信息"), text: $notes, axis: .vertical)
                         .lineLimit(2...4)
@@ -108,6 +124,14 @@ struct AddStudentView: View {
                     Button(loc.t("保存学员")) { saveStudent() }
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
+            }
+            .alert("保存失败", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("好", role: .cancel) { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "请稍后重试")
             }
         }
     }
@@ -125,15 +149,40 @@ struct AddStudentView: View {
             chestCm: Double(chestCm),
             waistCm: Double(waistCm),
             fitnessGoal: fitnessGoal,
-            notes: notes
+            notes: notes,
+            safetyNotes: safetyNotes,
+            totalPurchasedSessions: tracksCredits ? purchasedSessions : nil
         )
         modelContext.insert(student)
-        dismiss()
+
+        let measurement = BodyMeasurement(
+            weightKg: weightKg,
+            bodyFatPercentage: Double(bodyFatPercentage),
+            hipCm: Double(hipCm),
+            chestCm: Double(chestCm),
+            waistCm: Double(waistCm),
+            notes: "首次体测"
+        )
+        measurement.student = student
+        modelContext.insert(measurement)
+
+        do {
+            if tracksCredits {
+                try SessionService(context: modelContext)
+                    .createOpeningBalance(for: student, amount: purchasedSessions)
+            } else {
+                try modelContext.save()
+            }
+            dismiss()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
 #Preview {
     AddStudentView()
         .environmentObject(LocalizationManager.shared)
-        .modelContainer(for: [Student.self, WorkoutSession.self, ExerciseEntry.self], inMemory: true)
+        .modelContainer(for: [Student.self, WorkoutSession.self, ExerciseEntry.self, WorkoutSet.self, BodyMeasurement.self, CreditTransaction.self, WorkoutTemplate.self, TemplateExercise.self], inMemory: true)
 }
