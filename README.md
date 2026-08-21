@@ -1,55 +1,43 @@
-# FitCoach — 私教学员管理 App
+# FitCoach
 
-一个跑在 iPhone 上的私人教练管理工具，用 SwiftUI + SwiftData 写成，数据全部保存在手机本地（无需联网、无需后端）。
+私人教练的课间训练记录本：打开就能延续学员上一次训练。
 
-## 功能
+## MVP 主链路
 
-1. **学员档案**：姓名、性别、年龄、运动经验、首次体测（体重/身高/体脂率）、运动目标、备注。
-2. **训练计划**：为学员新建一次训练课程，添加多个动作（力量/有氧/拉伸/核心/HIIT），填写计划的组数、次数、组间间歇、预计时长。
-3. **实际完成记录**：训练结束后，在学员档案里打开该次课程，逐个动作填写实际完成的组数、次数、间歇、实际用时。
-4. **卡路里自动计算**：根据每个动作实际训练时长 × 动作类型对应的 MET（代谢当量）× 学员体重，自动算出该动作消耗的卡路里，并汇总出本次训练总消耗。
+1. “今天”默认展示下一位建议学员、上次训练、剩余课时与训练提醒。
+2. 点击“沿用上次并开始”，复制动作顺序与上次实际重量/次数。
+3. 每组独立记录重量、次数、RPE、备注与完成状态；完成后自动休息计时。
+4. 完成课程时明确展示课时变化，保存成功后才扣课。
+5. 完成页生成可编辑、可分享的简短总结。
 
-## 打开方式
+同时支持训练模板、体重/腰围/体脂趋势，以及包含逐组记录和课时流水的 JSON 备份。
 
-1. 用 Xcode 打开 `FitCoach.xcodeproj`。
-2. 在顶部选择一台模拟器（比如 iPhone 15）或连接你自己的 iPhone。
-3. 点击运行（▶️）按钮即可。
+## 技术结构
 
-首次在真机上运行需要在 Xcode 的 Signing & Capabilities 里选择你自己的 Apple ID 作为开发者团队（免费账号即可，仅用于本机调试，无需发布到 App Store）。
+- SwiftUI + SwiftData，最低 iOS 17，当前只发布 iPhone。
+- `SessionService` 集中处理复制、开始、完成、撤销与课时幂等。
+- `CreditTransaction` 账本计算余额，计划中/暂停/取消课程不扣课。
+- `WorkoutSet`、`BodyMeasurement`、`WorkoutTemplate` 提供逐组、趋势与模板数据。
+- iOS 26+ 仅在训练底部控制条使用原生 Liquid Glass；内容卡保持实体表面。
+- XcodeGen 的 `project.yml` 是工程配置源。
 
-## 项目结构
+## 构建与测试
 
-```
-FitCoach/
-  FitCoachApp.swift          入口，注册 SwiftData 数据容器
-  Models/
-    Student.swift            学员模型（含性别/运动经验枚举）
-    WorkoutSession.swift     一次训练课程
-    ExerciseEntry.swift      单个动作（计划 + 实际数据 + 卡路里计算）
-  Views/
-    StudentListView.swift        学员列表首页
-    AddStudentView.swift         新增学员表单
-    StudentDetailView.swift      学员详情 + 训练记录列表
-    AddWorkoutSessionView.swift  新增训练计划（添加多个动作）
-    WorkoutSessionDetailView.swift  训练详情，填写实际完成数据、查看卡路里
+```bash
+xcodegen generate
+xcodebuild \
+  -project FitCoach.xcodeproj \
+  -scheme FitCoach \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  test CODE_SIGNING_ALLOWED=NO
 ```
 
-## 卡路里计算公式
+UI 测试使用 `-uiTesting -resetStore` 注入确定性场景，不影响正常用户数据。
 
-```
-单个动作消耗(kcal) = MET × 学员体重(kg) × 实际训练时长(小时)
-```
+## 当前验证
 
-MET 参考值（可以在 `ExerciseEntry.swift` 里自行调整）：
-- 力量训练 5.0
-- 有氧训练 7.0
-- 拉伸/柔韧 2.5
-- 核心训练 4.0
-- 高强度间歇(HIIT) 8.5
+- 单元/集成：课时只扣一次、撤销/重完成、复制上次、体测历史、备份 V2 往返与重复导入。
+- UI：启动、完整训练 9→8、强退后草稿/休息计时恢复、AX5 主 CTA 可点击。
+- 视觉：iPhone SE、iPhone 17 Pro、iPhone 17 Pro Max；浅色与暗色。
 
-## 后续可以扩展的方向
-
-- 给学员拍照记录体测变化
-- 训练历史的图表趋势（体重变化、单次课程消耗趋势）
-- 常用动作库（避免每次手动输入动作名）
-- iCloud 同步，多设备共享学员档案
+完整验收标准见 [docs/MVP_ACCEPTANCE.md](docs/MVP_ACCEPTANCE.md)。

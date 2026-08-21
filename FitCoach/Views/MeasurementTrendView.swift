@@ -4,6 +4,7 @@ import Charts
 struct MeasurementTrendView: View {
     let student: Student
     @Environment(\.dismiss) private var dismiss
+    @State private var showingAddMeasurement = false
 
     private var measurements: [BodyMeasurement] { student.sortedMeasurements }
 
@@ -43,9 +44,105 @@ struct MeasurementTrendView: View {
         .navigationTitle("\(student.name)的趋势")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("记录体测", systemImage: "plus") { showingAddMeasurement = true }
+                    .minimumTapTarget()
+                    .accessibilityIdentifier("measurement.add")
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("完成") { dismiss() }
             }
+        }
+        .sheet(isPresented: $showingAddMeasurement) {
+            AddMeasurementView(student: student)
+        }
+    }
+}
+
+private struct AddMeasurementView: View {
+    let student: Student
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @State private var measuredAt = Date()
+    @State private var weight = ""
+    @State private var bodyFat = ""
+    @State private var waist = ""
+    @State private var hip = ""
+    @State private var chest = ""
+    @State private var notes = ""
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                DatePicker("日期", selection: $measuredAt, displayedComponents: [.date, .hourAndMinute])
+                Section("核心指标") {
+                    measurementField("体重", unit: "kg", text: $weight)
+                    measurementField("体脂率", unit: "%", text: $bodyFat)
+                    measurementField("腰围", unit: "cm", text: $waist)
+                }
+                Section("其他围度（可选）") {
+                    measurementField("臀围", unit: "cm", text: $hip)
+                    measurementField("胸围", unit: "cm", text: $chest)
+                }
+                Section("备注") {
+                    TextField("例如：晨起空腹", text: $notes, axis: .vertical)
+                }
+            }
+            .navigationTitle("记录体测")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") { save() }.disabled(allValuesEmpty)
+                }
+            }
+            .alert("保存失败", isPresented: Binding(
+                get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
+            )) { Button("好", role: .cancel) {} } message: { Text(errorMessage ?? "请重试") }
+        }
+    }
+
+    private var allValuesEmpty: Bool {
+        [weight, bodyFat, waist, hip, chest].allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty }
+    }
+
+    private func measurementField(_ title: String, unit: String, text: Binding<String>) -> some View {
+        LabeledContent(title) {
+            HStack(spacing: 6) {
+                TextField("—", text: text)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(minWidth: 70)
+                    .accessibilityLabel("\(title)，单位 \(unit)")
+                Text(unit).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func save() {
+        let record = BodyMeasurement(
+            measuredAt: measuredAt,
+            weightKg: Double(weight),
+            bodyFatPercentage: Double(bodyFat),
+            hipCm: Double(hip),
+            chestCm: Double(chest),
+            waistCm: Double(waist),
+            notes: notes
+        )
+        record.student = student
+        modelContext.insert(record)
+        if let value = record.weightKg { student.weightKg = value }
+        if let value = record.bodyFatPercentage { student.bodyFatPercentage = value }
+        if let value = record.waistCm { student.waistCm = value }
+        if let value = record.hipCm { student.hipCm = value }
+        if let value = record.chestCm { student.chestCm = value }
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
         }
     }
 }

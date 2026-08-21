@@ -11,6 +11,7 @@ struct ActiveWorkoutView: View {
     @State private var showingFinishConfirmation = false
     @State private var errorMessage: String?
     @State private var hapticTrigger = 0
+    @State private var pendingTextSave: Task<Void, Never>?
 
     init(session: WorkoutSession) {
         self.session = session
@@ -43,7 +44,8 @@ struct ActiveWorkoutView: View {
                                     exercise: currentExercise,
                                     session: session,
                                     onSetToggle: toggleSet,
-                                    onValueChange: saveDraft
+                                    onValueChange: saveDraft,
+                                    onTextChange: saveDraftDebounced
                                 )
                                 .id(currentExercise.id)
                                 .transition(.opacity.combined(with: .move(edge: .trailing)))
@@ -68,8 +70,11 @@ struct ActiveWorkoutView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
-                            Button("稍后继续") { dismiss() }
+                            Button { dismiss() } label: {
+                                Image(systemName: "pause.fill")
+                            }
                                 .minimumTapTarget()
+                                .accessibilityLabel("稍后继续")
                                 .accessibilityIdentifier("workout.pause")
                         }
                         ToolbarItem(placement: .topBarTrailing) {
@@ -98,6 +103,10 @@ struct ActiveWorkoutView: View {
             }
         }
         .sensoryFeedback(.success, trigger: hapticTrigger)
+        .onDisappear {
+            pendingTextSave?.cancel()
+            if modelContext.hasChanges { saveDraft() }
+        }
         .confirmationDialog(
             "完成本节训练？",
             isPresented: $showingFinishConfirmation,
@@ -146,6 +155,16 @@ struct ActiveWorkoutView: View {
         } catch {
             modelContext.rollback()
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func saveDraftDebounced() {
+        session.updatedAt = Date()
+        pendingTextSave?.cancel()
+        pendingTextSave = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            saveDraft()
         }
     }
 
@@ -220,6 +239,7 @@ private struct ExerciseSetEditor: View {
     let session: WorkoutSession
     let onSetToggle: (WorkoutSet, Int) -> Void
     let onValueChange: () -> Void
+    let onTextChange: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -243,7 +263,8 @@ private struct ExerciseSetEditor: View {
                     set: set,
                     restSeconds: exercise.plannedRestSeconds,
                     onToggle: { onSetToggle(set, exercise.plannedRestSeconds) },
-                    onValueChange: onValueChange
+                    onValueChange: onValueChange,
+                    onTextChange: onTextChange
                 )
             }
 
@@ -254,7 +275,7 @@ private struct ExerciseSetEditor: View {
 
             TextField("动作备注，例如：右膝感觉良好", text: Binding(
                 get: { exercise.notes },
-                set: { exercise.notes = $0; onValueChange() }
+                set: { exercise.notes = $0; onTextChange() }
             ), axis: .vertical)
             .lineLimit(2...4)
             .textFieldStyle(.roundedBorder)
@@ -268,6 +289,7 @@ private struct WorkoutSetRow: View {
     let restSeconds: Int
     let onToggle: () -> Void
     let onValueChange: () -> Void
+    let onTextChange: () -> Void
 
     var body: some View {
         AppCard {
@@ -308,7 +330,7 @@ private struct WorkoutSetRow: View {
 
                 TextField("本组备注（可选）", text: Binding(
                     get: { set.notes },
-                    set: { set.notes = $0; onValueChange() }
+                    set: { set.notes = $0; onTextChange() }
                 ))
                 .textFieldStyle(.plain)
                 .font(.subheadline)

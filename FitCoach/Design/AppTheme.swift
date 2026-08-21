@@ -49,19 +49,27 @@ struct FloatingTrainingChrome: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *), !reduceTransparency {
             content
                 .padding(10)
                 .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
         } else {
-            content
-                .padding(10)
-                .background(
-                    reduceTransparency ? Color(uiColor: .systemBackground) : Color(uiColor: .secondarySystemBackground).opacity(0.94),
-                    in: RoundedRectangle(cornerRadius: 30, style: .continuous)
-                )
-                .shadow(color: .black.opacity(0.12), radius: 18, y: 8)
+            fallback(content)
         }
+        #else
+        fallback(content)
+        #endif
+    }
+
+    private func fallback(_ content: Content) -> some View {
+        content
+            .padding(10)
+            .background(
+                reduceTransparency ? Color(uiColor: .systemBackground) : Color(uiColor: .secondarySystemBackground).opacity(0.94),
+                in: RoundedRectangle(cornerRadius: 30, style: .continuous)
+            )
+            .shadow(color: .black.opacity(0.12), radius: 18, y: 8)
     }
 }
 
