@@ -128,7 +128,13 @@ enum LegacyDataBackfill {
 
         var sessionIDs = Set<UUID>()
         for session in sessions {
+            let legacyID = session.id
             while sessionIDs.contains(session.id) { session.id = UUID() }
+            if session.id != legacyID {
+                for transaction in session.creditTransactions {
+                    transaction.sessionIDSnapshot = session.id
+                }
+            }
             sessionIDs.insert(session.id)
         }
 

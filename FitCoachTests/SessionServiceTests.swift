@@ -229,6 +229,25 @@ final class SessionServiceTests: XCTestCase {
         let second = makeStudent(in: context)
         second.name = "第二位"
         second.id = duplicateID
+        let firstSession = WorkoutSession(title: "第一节", status: .completed)
+        firstSession.id = duplicateID
+        firstSession.student = first
+        context.insert(firstSession)
+        let secondSession = WorkoutSession(title: "第二节", status: .completed)
+        secondSession.id = duplicateID
+        secondSession.student = second
+        context.insert(secondSession)
+        for (index, session) in [firstSession, secondSession].enumerated() {
+            let transaction = CreditTransaction(
+                idempotencyKey: "pre-repair-\(index)",
+                amount: -1,
+                kind: .consume,
+                sessionIDSnapshot: duplicateID
+            )
+            transaction.student = session.student
+            transaction.session = session
+            context.insert(transaction)
+        }
         context.insert(MigrationMarker(key: "legacy-v3-backfill"))
         try context.save()
 
@@ -236,6 +255,9 @@ final class SessionServiceTests: XCTestCase {
         try LegacyDataBackfill.run(in: context)
 
         XCTAssertEqual(Set([first.id, second.id]).count, 2)
+        XCTAssertEqual(Set([firstSession.id, secondSession.id]).count, 2)
+        XCTAssertTrue(firstSession.creditTransactions.allSatisfy { $0.sessionIDSnapshot == firstSession.id })
+        XCTAssertTrue(secondSession.creditTransactions.allSatisfy { $0.sessionIDSnapshot == secondSession.id })
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<MigrationMarker>()), 2)
     }
 
