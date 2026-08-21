@@ -305,6 +305,14 @@ private struct WorkoutSetRow: View {
                         increase: { changeRPE(by: 0.5) }
                     )
                 }
+
+                TextField("本组备注（可选）", text: Binding(
+                    get: { set.notes },
+                    set: { set.notes = $0; onValueChange() }
+                ))
+                .textFieldStyle(.plain)
+                .font(.subheadline)
+                .accessibilityLabel("第 \(set.sortIndex + 1) 组备注")
             }
         }
         .opacity(set.isCompleted ? 0.78 : 1)

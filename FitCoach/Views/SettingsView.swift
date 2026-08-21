@@ -27,6 +27,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var loc: LocalizationManager
     @Query private var allStudents: [Student]
+    @Query private var allTemplates: [WorkoutTemplate]
 
     @State private var exportDocument: BackupDocument?
     @State private var showingExporter = false
@@ -38,8 +39,13 @@ struct SettingsView: View {
         Form {
             Section {
                 Button {
-                    exportDocument = BackupDocument(data: buildExportData())
-                    showingExporter = true
+                    do {
+                        exportDocument = BackupDocument(data: try buildExportData())
+                        showingExporter = true
+                    } catch {
+                        statusIsError = true
+                        statusMessage = "导出失败：\(error.localizedDescription)"
+                    }
                 } label: {
                     Label(loc.t("导出数据"), systemImage: "square.and.arrow.up")
                 }
@@ -61,7 +67,7 @@ struct SettingsView: View {
                         .foregroundStyle(statusIsError ? .red : .secondary)
                 }
             } footer: {
-                Text(loc.t("导入会把备份文件里的学员和训练记录新增进来，不会覆盖或删除现有数据，注意避免重复导入同一份备份。"))
+                Text("新备份包含逐组记录、RPE、体测、模板和课时流水。同一份新格式备份重复导入会自动跳过。")
             }
         }
         .navigationTitle(loc.t("设置"))
@@ -71,7 +77,12 @@ struct SettingsView: View {
             document: exportDocument,
             contentType: .json,
             defaultFilename: exportFileName()
-        ) { _ in }
+        ) { result in
+            if case .failure(let error) = result {
+                statusIsError = true
+                statusMessage = "导出失败：\(error.localizedDescription)"
+            }
+        }
         .fileImporter(
             isPresented: $showingImporter,
             allowedContentTypes: [.json]
@@ -86,15 +97,8 @@ struct SettingsView: View {
         return "FitCoach-\(formatter.string(from: Date()))"
     }
 
-    private func buildExportData() -> Data {
-        let payload = BackupPayload(
-            exportedAt: Date(),
-            students: allStudents.map { $0.toBackup() }
-        )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return (try? encoder.encode(payload)) ?? Data()
+    private func buildExportData() throws -> Data {
+        try BackupV2Service.encode(students: allStudents, templates: allTemplates)
     }
 
     private func handleImport(_ result: Result<URL, Error>) {
@@ -113,16 +117,21 @@ struct SettingsView: View {
 
             do {
                 let data = try Data(contentsOf: url)
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                let payload = try decoder.decode(BackupPayload.self, from: data)
-
-                for studentBackup in payload.students {
-                    insertBackupStudent(studentBackup, into: modelContext)
+                if let archive = try? BackupV2Service.decode(data) {
+                    let result = try BackupV2Service.insert(archive, into: modelContext)
+                    statusIsError = false
+                    statusMessage = "导入成功：新增 \(result.importedStudents) 位，跳过 \(result.skippedStudents) 位"
+                } else {
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    let payload = try decoder.decode(BackupPayload.self, from: data)
+                    for studentBackup in payload.students {
+                        insertBackupStudent(studentBackup, into: modelContext)
+                    }
+                    try modelContext.save()
+                    statusIsError = false
+                    statusMessage = "旧版备份导入成功：\(payload.students.count) 位学员"
                 }
-
-                statusIsError = false
-                statusMessage = "\(loc.t("导入成功"))：\(payload.students.count) \(loc.t("位学员"))"
             } catch {
                 statusIsError = true
                 statusMessage = "\(loc.t("导入失败"))：\(error.localizedDescription)"
@@ -135,6 +144,6 @@ struct SettingsView: View {
     NavigationStack {
         SettingsView()
             .environmentObject(LocalizationManager.shared)
-            .modelContainer(for: [Student.self, WorkoutSession.self, ExerciseEntry.self], inMemory: true)
+            .modelContainer(for: [Student.self, WorkoutSession.self, ExerciseEntry.self, WorkoutSet.self, BodyMeasurement.self, CreditTransaction.self, WorkoutTemplate.self, TemplateExercise.self], inMemory: true)
     }
 }

@@ -10,6 +10,7 @@ final class WorkoutSet {
     var actualWeightKg: Double?
     var actualReps: Int?
     var rpe: Double?
+    var notes: String = ""
     var isCompleted: Bool
     var completedAt: Date?
     var exercise: ExerciseEntry?
@@ -22,6 +23,7 @@ final class WorkoutSet {
         actualWeightKg: Double? = nil,
         actualReps: Int? = nil,
         rpe: Double? = nil,
+        notes: String = "",
         isCompleted: Bool = false,
         completedAt: Date? = nil
     ) {
@@ -32,6 +34,7 @@ final class WorkoutSet {
         self.actualWeightKg = actualWeightKg
         self.actualReps = actualReps
         self.rpe = rpe
+        self.notes = notes
         self.isCompleted = isCompleted
         self.completedAt = completedAt
     }
