@@ -144,6 +144,32 @@ final class SessionServiceTests: XCTestCase {
         XCTAssertTrue(student.creditTransactions.isEmpty)
     }
 
+    func testCancelledAndPlannedSessionsRejectTrainingMutations() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let student = makeStudent(in: context)
+        let service = SessionService(context: context)
+        let planned = makeSession(for: student, in: context)
+        planned.status = .planned
+        let plannedSet = try XCTUnwrap(planned.exercises.first?.sets.first)
+
+        XCTAssertThrowsError(try service.complete(planned)) { error in
+            XCTAssertEqual(error as? SessionServiceError, .invalidState)
+        }
+        XCTAssertThrowsError(try service.completeSet(plannedSet, in: planned, restSeconds: 60)) { error in
+            XCTAssertEqual(error as? SessionServiceError, .invalidState)
+        }
+
+        planned.status = .cancelled
+        XCTAssertThrowsError(try service.complete(planned)) { error in
+            XCTAssertEqual(error as? SessionServiceError, .invalidState)
+        }
+        XCTAssertThrowsError(try service.undoSet(plannedSet, in: planned)) { error in
+            XCTAssertEqual(error as? SessionServiceError, .invalidState)
+        }
+        XCTAssertTrue(student.creditTransactions.isEmpty)
+    }
+
     func testLegacyBackfillIsIdempotent() throws {
         let container = try makeContainer()
         let context = container.mainContext

@@ -118,6 +118,20 @@ func insertBackupStudent(_ backup: StudentBackup, into context: ModelContext) {
     )
     context.insert(student)
 
+    if backup.weightKg > 0 || backup.bodyFatPercentage != nil || backup.waistCm != nil {
+        let measurement = BodyMeasurement(
+            measuredAt: student.createdDate,
+            weightKg: backup.weightKg > 0 ? backup.weightKg : nil,
+            bodyFatPercentage: backup.bodyFatPercentage,
+            hipCm: backup.hipCm,
+            chestCm: backup.chestCm,
+            waistCm: backup.waistCm,
+            notes: "旧版备份初始体测"
+        )
+        measurement.student = student
+        context.insert(measurement)
+    }
+
     for sessionBackup in backup.workoutSessions {
         let isCompleted = sessionBackup.exercises.contains(where: \.isCompleted)
         let session = WorkoutSession(

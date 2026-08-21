@@ -5,6 +5,7 @@ enum SessionServiceError: LocalizedError, Equatable {
     case missingStudent
     case noExercises
     case noCompletedWork
+    case invalidState
     case saveFailed
 
     var errorDescription: String? {
@@ -12,6 +13,7 @@ enum SessionServiceError: LocalizedError, Equatable {
         case .missingStudent: return "课程没有关联学员"
         case .noExercises: return "训练中还没有动作"
         case .noCompletedWork: return "请至少完成一组后再结束训练"
+        case .invalidState: return "当前课程状态不允许此操作"
         case .saveFailed: return "数据保存失败，请重试"
         }
     }
@@ -134,6 +136,7 @@ struct SessionService {
     }
 
     func completeSet(_ set: WorkoutSet, in session: WorkoutSession, restSeconds: Int) throws {
+        guard session.status == .inProgress else { throw SessionServiceError.invalidState }
         let timestamp = now()
         set.isCompleted = true
         set.completedAt = timestamp
@@ -145,6 +148,7 @@ struct SessionService {
     }
 
     func undoSet(_ set: WorkoutSet, in session: WorkoutSession) throws {
+        guard session.status == .inProgress else { throw SessionServiceError.invalidState }
         set.isCompleted = false
         set.completedAt = nil
         session.restEndsAt = nil
@@ -154,6 +158,7 @@ struct SessionService {
 
     func complete(_ session: WorkoutSession, editedSummary: String? = nil) throws {
         guard session.status != .completed else { return }
+        guard session.status == .inProgress else { throw SessionServiceError.invalidState }
         guard !session.exercises.isEmpty else { throw SessionServiceError.noExercises }
         guard session.completedSetCount > 0 || session.exercises.contains(where: \.isCompleted) else {
             throw SessionServiceError.noCompletedWork
@@ -285,7 +290,9 @@ struct SessionService {
     }
 
     func cancel(_ session: WorkoutSession) throws {
-        guard session.status != .completed else { return }
+        guard session.status == .planned || session.status == .inProgress else {
+            throw SessionServiceError.invalidState
+        }
         session.status = .cancelled
         session.restEndsAt = nil
         session.updatedAt = now()

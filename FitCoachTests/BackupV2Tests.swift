@@ -103,6 +103,8 @@ final class BackupV2Tests: XCTestCase {
         XCTAssertEqual(session.status, .completed)
         XCTAssertEqual(session.exercises.first?.sets.filter(\.isCompleted).count, 2)
         XCTAssertEqual(student.remainingSessions, 9)
+        XCTAssertEqual(student.measurements.count, 1)
+        XCTAssertEqual(student.measurements.first?.weightKg, 60)
     }
 
     func testImportCompletesExistingStudentInsteadOfSkippingChildren() throws {

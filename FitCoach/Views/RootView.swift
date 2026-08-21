@@ -1,19 +1,30 @@
 import SwiftUI
 import SwiftData
 
-/// App的真正入口：先看有没有"App使用者本人"的档案。
-/// 没有 → 说明是第一次打开，先走 OnboardingView 填个人信息。
-/// 有 → 直接进"我的学员"主页面，以后每次打开都会走这条路。
+/// App 入口。旧数据回填完成后再准备演示数据，失败会明确告知用户。
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
+    @State private var migrationError: String?
 
     var body: some View {
         AppShellView()
             .task {
                 if !ProcessInfo.processInfo.arguments.contains("-uiTesting") {
-                    try? LegacyDataBackfill.run(in: modelContext)
+                    do {
+                        try LegacyDataBackfill.run(in: modelContext)
+                    } catch {
+                        migrationError = "旧数据升级失败：\(error.localizedDescription)"
+                    }
                 }
                 DemoDataSeeder.prepareIfNeeded(in: modelContext)
+            }
+            .alert("数据升级未完成", isPresented: Binding(
+                get: { migrationError != nil },
+                set: { if !$0 { migrationError = nil } }
+            )) {
+                Button("好", role: .cancel) { migrationError = nil }
+            } message: {
+                Text(migrationError ?? "请重新启动 App 后再试")
             }
     }
 }
