@@ -193,6 +193,7 @@ struct ProfileView: View {
     @AppStorage(RestNotificationService.enabledKey) private var restNotificationsEnabled = false
     @State private var notificationMessage: String?
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         List {
@@ -227,12 +228,10 @@ struct ProfileView: View {
             Section { LabeledContent("版本", value: "1.0 MVP") }
         }
         .navigationTitle("我的")
-        .task {
-            guard restNotificationsEnabled else { return }
-            if !(await RestNotificationService.isAuthorized()) {
-                restNotificationsEnabled = false
-                notificationMessage = "系统通知权限已关闭。训练计时仍可使用；需要后台提醒时可前往设置开启。"
-            }
+        .task { await synchronizeNotificationPermission() }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await synchronizeNotificationPermission() }
         }
         .alert("无法开启提醒", isPresented: Binding(
             get: { notificationMessage != nil },
@@ -247,6 +246,15 @@ struct ProfileView: View {
             Button("好", role: .cancel) { notificationMessage = nil }
         } message: {
             Text(notificationMessage ?? "请稍后重试")
+        }
+    }
+
+    @MainActor
+    private func synchronizeNotificationPermission() async {
+        guard restNotificationsEnabled else { return }
+        if !(await RestNotificationService.isAuthorized()) {
+            restNotificationsEnabled = false
+            notificationMessage = "系统通知权限已关闭。训练计时仍可使用；需要后台提醒时可前往设置开启。"
         }
     }
 }

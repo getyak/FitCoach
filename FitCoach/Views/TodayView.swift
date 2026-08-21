@@ -240,9 +240,9 @@ private struct FocusClientCard: View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(activeSession == nil ? "快速继续" : "训练进行中")
+                    Text(statusCaption)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(activeSession == nil ? AppTheme.brand : AppTheme.success)
+                        .foregroundStyle(activeSession?.status == .inProgress ? AppTheme.success : AppTheme.brand)
                     Text(student.name)
                         .font(.headline)
                         .accessibilityIdentifier("today.focusName")
@@ -257,9 +257,9 @@ private struct FocusClientCard: View {
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(activeSession == nil ? "快速继续" : "训练进行中")
+                        Text(statusCaption)
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(activeSession == nil ? AppTheme.brand : AppTheme.success)
+                            .foregroundStyle(activeSession?.status == .inProgress ? AppTheme.success : AppTheme.brand)
                         Text(student.name)
                             .font(.title2.bold())
                             .accessibilityIdentifier("today.focusName")
@@ -272,12 +272,28 @@ private struct FocusClientCard: View {
     private var primaryAction: some View {
         Button(action: onStart) {
             Label(
-                activeSession == nil ? (previousSession == nil ? "创建第一节训练" : "沿用上次并开始") : "继续本节训练",
+                primaryActionTitle,
                 systemImage: activeSession == nil ? "play.fill" : "arrow.right"
             )
         }
         .buttonStyle(PrimaryActionButtonStyle())
         .accessibilityIdentifier("today.startWorkout")
+    }
+
+    private var statusCaption: String {
+        switch activeSession?.status {
+        case .planned: "计划已保存"
+        case .inProgress: "训练进行中"
+        default: "快速继续"
+        }
+    }
+
+    private var primaryActionTitle: String {
+        switch activeSession?.status {
+        case .planned: "开始已保存计划"
+        case .inProgress: "继续本节训练"
+        default: previousSession == nil ? "创建第一节训练" : "沿用上次并开始"
+        }
     }
 }
 
