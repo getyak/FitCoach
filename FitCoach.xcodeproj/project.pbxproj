@@ -20,10 +20,16 @@
 		482AE0E389196D270D867E5B /* FitCoachSmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 815CAFB6EC8E6368893FEA93 /* FitCoachSmokeUITests.swift */; };
 		496DEDC97928646D4A62722E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0343357B014518A3ADFF6179 /* SettingsView.swift */; };
 		532E1669864DAC0D87922E52 /* SessionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86CDE22294BD22F279E1F24A /* SessionService.swift */; };
+		A106A106A106A106A106A106 /* RestTimerCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A206A206A206A206A206A206 /* RestTimerCoordinator.swift */; };
 		548BE2C03603D0F93F6005C2 /* WorkoutSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1D07567FC46E6C33EB91BA /* WorkoutSession.swift */; };
 		6560E3B5E5481BF9606E10B2 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A028AE5A7411E17636C43FB6 /* OnboardingView.swift */; };
 		6ABD8AAE9C8CDC28F33F750D /* FitCoachLiveActivityBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C66F5E0A705724836665D7AD /* FitCoachLiveActivityBundle.swift */; };
 		6B59FB520D515F5AEF73085E /* ActiveWorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE12222859B86664A5A47A08 /* ActiveWorkoutView.swift */; };
+		A101A101A101A101A101A101 /* TrainingNavigationHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A201A201A201A201A201A201 /* TrainingNavigationHeader.swift */; };
+		A102A102A102A102A102A102 /* ExerciseSetEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A202A202A202A202A202A202 /* ExerciseSetEditor.swift */; };
+		A103A103A103A103A103A103 /* WorkoutSetRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A203A203A203A203A203A203 /* WorkoutSetRow.swift */; };
+		A104A104A104A104A104A104 /* WorkoutValueControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = A204A204A204A204A204A204 /* WorkoutValueControls.swift */; };
+		A105A105A105A105A105A105 /* WorkoutBottomControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = A205A205A205A205A205A205 /* WorkoutBottomControls.swift */; };
 		6F8F241A15266773CA05A4D5 /* RestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46CEAFA20B9C3A9B921F30E /* RestActivityAttributes.swift */; };
 		7B076B3CC95493A204EFB1B5 /* AddStudentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECAD1C8BD4E0D5B27D191615 /* AddStudentView.swift */; };
 		7B3E555D14FE66D98FF42ED0 /* FitCoachV1.store in Resources */ = {isa = PBXBuildFile; fileRef = 037A57A8EE87C47DA870D2BC /* FitCoachV1.store */; };
@@ -46,6 +52,7 @@
 		F113A685F6380F25DB1EAA0A /* ExerciseEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2E0E2B069D653E11B711F94 /* ExerciseEntry.swift */; };
 		F2C21027ED8E0592323FAC18 /* RestNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9258FE40F7748198229C79AD /* RestNotificationService.swift */; };
 		F4D7834334DAB487708F1E7A /* SessionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 954781C58DB0B28999A9C41E /* SessionServiceTests.swift */; };
+		A107A107A107A107A107A107 /* RestTimerCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A207A207A207A207A207A207 /* RestTimerCoordinatorTests.swift */; };
 		FA9A2FB251E0708544D3E2EC /* Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D4B4C15D7903D4D2EB1879A /* Backup.swift */; };
 		FB22A188BB6655C79A3A4D02 /* LegacyDataBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01CED3F9B65EE864B80B9662 /* LegacyDataBackfill.swift */; };
 		FE55321EB9475A2EC2CC7772 /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AA7574924692C654DA530E5 /* AppShellView.swift */; };
@@ -119,8 +126,10 @@
 		86CDE22294BD22F279E1F24A /* SessionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
 		8EDC482C95D021A2FA775C5B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		9258FE40F7748198229C79AD /* RestNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestNotificationService.swift; sourceTree = "<group>"; };
+		A206A206A206A206A206A206 /* RestTimerCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerCoordinator.swift; sourceTree = "<group>"; };
 		93AF98198C341AEB0E7D2B0D /* DemoDataSeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoDataSeeder.swift; sourceTree = "<group>"; };
 		954781C58DB0B28999A9C41E /* SessionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionServiceTests.swift; sourceTree = "<group>"; };
+		A207A207A207A207A207A207 /* RestTimerCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerCoordinatorTests.swift; sourceTree = "<group>"; };
 		A028AE5A7411E17636C43FB6 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		A053832B2999103C43BA38FD /* TemplatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplatesView.swift; sourceTree = "<group>"; };
 		A46CEAFA20B9C3A9B921F30E /* RestActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestActivityAttributes.swift; sourceTree = "<group>"; };
@@ -131,6 +140,11 @@
 		D2E0E2B069D653E11B711F94 /* ExerciseEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseEntry.swift; sourceTree = "<group>"; };
 		D323E88F1E845E2C00F71458 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		DE12222859B86664A5A47A08 /* ActiveWorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutView.swift; sourceTree = "<group>"; };
+		A201A201A201A201A201A201 /* TrainingNavigationHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingNavigationHeader.swift; sourceTree = "<group>"; };
+		A202A202A202A202A202A202 /* ExerciseSetEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseSetEditor.swift; sourceTree = "<group>"; };
+		A203A203A203A203A203A203 /* WorkoutSetRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetRow.swift; sourceTree = "<group>"; };
+		A204A204A204A204A204A204 /* WorkoutValueControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutValueControls.swift; sourceTree = "<group>"; };
+		A205A205A205A205A205A205 /* WorkoutBottomControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutBottomControls.swift; sourceTree = "<group>"; };
 		E3A19A358A5C009A0A89321C /* TrainingModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingModels.swift; sourceTree = "<group>"; };
 		E794BFB82F2CA7D59029CE6C /* BackupV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupV2.swift; sourceTree = "<group>"; };
 		ECAD1C8BD4E0D5B27D191615 /* AddStudentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddStudentView.swift; sourceTree = "<group>"; };
@@ -143,6 +157,7 @@
 			children = (
 				01CED3F9B65EE864B80B9662 /* LegacyDataBackfill.swift */,
 				4975C99E952CB2DE67FFF300 /* RestActivityService.swift */,
+				A206A206A206A206A206A206 /* RestTimerCoordinator.swift */,
 				9258FE40F7748198229C79AD /* RestNotificationService.swift */,
 				86CDE22294BD22F279E1F24A /* SessionService.swift */,
 			);
@@ -228,6 +243,11 @@
 			isa = PBXGroup;
 			children = (
 				DE12222859B86664A5A47A08 /* ActiveWorkoutView.swift */,
+				A201A201A201A201A201A201 /* TrainingNavigationHeader.swift */,
+				A202A202A202A202A202A202 /* ExerciseSetEditor.swift */,
+				A203A203A203A203A203A203 /* WorkoutSetRow.swift */,
+				A204A204A204A204A204A204 /* WorkoutValueControls.swift */,
+				A205A205A205A205A205A205 /* WorkoutBottomControls.swift */,
 				ECAD1C8BD4E0D5B27D191615 /* AddStudentView.swift */,
 				3ED7DE9AAEB46C8E151233C2 /* AddWorkoutSessionView.swift */,
 				7AA7574924692C654DA530E5 /* AppShellView.swift */,
@@ -253,6 +273,7 @@
 				1E47EC1F2F57D613CBB74621 /* Fixtures */,
 				47B4B04863232260F7BB41B4 /* BackupV2Tests.swift */,
 				954781C58DB0B28999A9C41E /* SessionServiceTests.swift */,
+				A207A207A207A207A207A207 /* RestTimerCoordinatorTests.swift */,
 			);
 			path = FitCoachTests;
 			sourceTree = "<group>";
@@ -432,6 +453,7 @@
 			files = (
 				BFF47BDE4A8C76903A58B144 /* BackupV2Tests.swift in Sources */,
 				F4D7834334DAB487708F1E7A /* SessionServiceTests.swift in Sources */,
+				A107A107A107A107A107A107 /* RestTimerCoordinatorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -440,6 +462,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				6B59FB520D515F5AEF73085E /* ActiveWorkoutView.swift in Sources */,
+				A101A101A101A101A101A101 /* TrainingNavigationHeader.swift in Sources */,
+				A102A102A102A102A102A102 /* ExerciseSetEditor.swift in Sources */,
+				A103A103A103A103A103A103 /* WorkoutSetRow.swift in Sources */,
+				A104A104A104A104A104A104 /* WorkoutValueControls.swift in Sources */,
+				A105A105A105A105A105A105 /* WorkoutBottomControls.swift in Sources */,
 				7B076B3CC95493A204EFB1B5 /* AddStudentView.swift in Sources */,
 				845E2FCF39E6B5E08C1F94DB /* AddWorkoutSessionView.swift in Sources */,
 				FE55321EB9475A2EC2CC7772 /* AppShellView.swift in Sources */,
@@ -456,6 +483,7 @@
 				6560E3B5E5481BF9606E10B2 /* OnboardingView.swift in Sources */,
 				7EB358C6AF7CFF1F4DB70ED7 /* RestActivityAttributes.swift in Sources */,
 				481564E933AA822DD3E5A79A /* RestActivityService.swift in Sources */,
+				A106A106A106A106A106A106 /* RestTimerCoordinator.swift in Sources */,
 				F2C21027ED8E0592323FAC18 /* RestNotificationService.swift in Sources */,
 				D118F40B614877B65EDF3AA8 /* RootView.swift in Sources */,
 				8F8D757184207745E58EB5E1 /* SessionHistoryDetailView.swift in Sources */,

@@ -17,7 +17,12 @@ enum RestNotificationService {
         return status == .authorized || status == .provisional || status == .ephemeral
     }
 
-    static func schedule(for sessionID: UUID, exerciseName: String, endDate: Date) async -> Bool {
+    static func schedule(
+        for sessionID: UUID,
+        exerciseName: String,
+        endDate: Date,
+        operationID: UUID
+    ) async -> Bool {
         guard UserDefaults.standard.bool(forKey: enabledKey) else { return true }
         let seconds = endDate.timeIntervalSinceNow
         guard seconds > 1 else { return true }
@@ -28,7 +33,7 @@ enum RestNotificationService {
         content.sound = .default
 
         let request = UNNotificationRequest(
-            identifier: identifier(for: sessionID),
+            identifier: identifier(for: sessionID, operationID: operationID),
             content: content,
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
         )
@@ -40,10 +45,19 @@ enum RestNotificationService {
         }
     }
 
-    static func cancel(for sessionID: UUID) {
+    static func cancel(for sessionID: UUID, operationID: UUID) {
         UNUserNotificationCenter.current().removePendingNotificationRequests(
-            withIdentifiers: [identifier(for: sessionID)]
+            withIdentifiers: [identifier(for: sessionID, operationID: operationID)]
         )
+    }
+
+    static func cancel(for sessionID: UUID) async {
+        let center = UNUserNotificationCenter.current()
+        let prefix = identifierPrefix(for: sessionID)
+        let identifiers = await center.pendingNotificationRequests()
+            .map(\.identifier)
+            .filter { $0.hasPrefix(prefix) }
+        center.removePendingNotificationRequests(withIdentifiers: identifiers)
     }
 
     static func cancelAll() async {
@@ -54,7 +68,11 @@ enum RestNotificationService {
         center.removePendingNotificationRequests(withIdentifiers: identifiers)
     }
 
-    private static func identifier(for sessionID: UUID) -> String {
-        "rest:\(sessionID.uuidString)"
+    private static func identifierPrefix(for sessionID: UUID) -> String {
+        "rest:\(sessionID.uuidString):"
+    }
+
+    private static func identifier(for sessionID: UUID, operationID: UUID) -> String {
+        "\(identifierPrefix(for: sessionID))\(operationID.uuidString)"
     }
 }

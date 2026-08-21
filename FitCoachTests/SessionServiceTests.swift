@@ -59,6 +59,20 @@ final class SessionServiceTests: XCTestCase {
         XCTAssertTrue(session.summary.contains("1 组"))
     }
 
+    func testCompletingASetDoesNotInventAnUnrecordedRPE() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let student = makeStudent(in: context)
+        let session = makeSession(for: student, in: context, completed: false)
+        let set = try XCTUnwrap(session.sortedExercises.first?.sortedSets.first)
+        XCTAssertNil(set.rpe)
+
+        try SessionService(context: context).completeSet(set, in: session, restSeconds: 0)
+
+        XCTAssertTrue(set.isCompleted)
+        XCTAssertNil(set.rpe)
+    }
+
     func testReopenRefundsOnceAndRecompleteKeepsNetSingleDebit() throws {
         let container = try makeContainer()
         let context = container.mainContext

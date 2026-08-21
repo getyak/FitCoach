@@ -178,6 +178,7 @@ final class FitCoachSmokeUITests: XCTestCase {
         let reps = app.descendants(matching: .any)["workout.control.次数"].firstMatch
         let rpe = app.descendants(matching: .any)["workout.control.RPE"].firstMatch
         XCTAssertTrue(weight.waitForExistence(timeout: 5))
+        XCTAssertEqual(rpe.label, "记录 RPE")
         XCTAssertEqual(rpe.value as? String, "未记录")
         tapAdjustment(on: weight, increment: true)
         tapAdjustment(on: reps, increment: false)
@@ -373,6 +374,9 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertTrue(weight.isHittable)
         XCTAssertTrue(reps.isHittable)
         XCTAssertTrue(rpe.isHittable)
+        XCTAssertEqual(rpe.label, "记录 RPE")
+        XCTAssertEqual(rpe.value as? String, "未记录")
+        assertHorizontallyContained(rpe, in: app)
         XCTAssertLessThan(weight.frame.midY, reps.frame.midY)
         XCTAssertLessThan(reps.frame.midY, rpe.frame.midY)
         XCTAssertTrue(app.buttons["workout.completeCurrentSet"].isHittable)

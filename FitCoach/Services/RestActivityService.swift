@@ -12,6 +12,7 @@ enum RestActivityService {
         }
 
         let generation = beginOperation(for: sessionID)
+        defer { finishOperation(generation, for: sessionID) }
 
         let sessionKey = sessionID.uuidString
         let content = ActivityContent(
@@ -45,11 +46,14 @@ enum RestActivityService {
     }
 
     static func end(for sessionID: UUID) async {
-        _ = beginOperation(for: sessionID)
+        let generation = beginOperation(for: sessionID)
+        defer { finishOperation(generation, for: sessionID) }
         let sessionKey = sessionID.uuidString
         for activity in Activity<RestActivityAttributes>.activities
         where activity.attributes.sessionID == sessionKey {
+            guard isCurrent(generation, for: sessionID) else { return }
             await end(activity)
+            guard isCurrent(generation, for: sessionID) else { return }
         }
     }
 
@@ -57,9 +61,13 @@ enum RestActivityService {
         for activity in Activity<RestActivityAttributes>.activities
         where activity.content.state.endsAt <= now {
             if let sessionID = UUID(uuidString: activity.attributes.sessionID) {
-                _ = beginOperation(for: sessionID)
+                let generation = beginOperation(for: sessionID)
+                guard isCurrent(generation, for: sessionID) else { continue }
+                await end(activity)
+                finishOperation(generation, for: sessionID)
+            } else {
+                await end(activity)
             }
-            await end(activity)
         }
     }
 
@@ -87,5 +95,10 @@ enum RestActivityService {
 
     private static func isCurrent(_ generation: Int, for sessionID: UUID) -> Bool {
         generations[sessionID] == generation
+    }
+
+    private static func finishOperation(_ generation: Int, for sessionID: UUID) {
+        guard isCurrent(generation, for: sessionID) else { return }
+        generations.removeValue(forKey: sessionID)
     }
 }
