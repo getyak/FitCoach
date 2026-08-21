@@ -763,7 +763,23 @@ private struct NumericValueEditor: View {
     }
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            ZStack {
+                Text(metric.title)
+                    .font(.headline)
+
+                HStack {
+                    Button("取消") { dismiss() }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.primary)
+                        .minimumTapTarget()
+                        .accessibilityIdentifier("workout.directInput.cancel")
+                    Spacer()
+                }
+            }
+            .frame(minHeight: 52)
+            .padding(.horizontal, 16)
+
             VStack(spacing: 22) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     TextField("0", text: $text)
@@ -811,21 +827,20 @@ private struct NumericValueEditor: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 48)
+                        .foregroundStyle(Color(uiColor: .systemBackground))
+                        .background(
+                            Color(uiColor: .label),
+                            in: Capsule()
+                        )
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(AppTheme.primaryAction)
+                .buttonStyle(.plain)
+                .opacity(parsedValue == nil ? 0.35 : 1)
                 .disabled(parsedValue == nil)
                 .accessibilityIdentifier("workout.directInput.save")
             }
             .padding(20)
-            .navigationTitle(metric.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
-                }
-            }
         }
+        .background(Color(uiColor: .systemBackground))
         .task { isFocused = true }
     }
 }
