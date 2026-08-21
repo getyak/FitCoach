@@ -95,6 +95,7 @@ struct ActiveWorkoutView: View {
                     .safeAreaInset(edge: .bottom) {
                         WorkoutBottomControls(
                             currentSetNumber: nextIncompleteSet.map { $0.sortIndex + 1 },
+                            canGoPrevious: currentExerciseIndex > 0,
                             isLastExercise: currentExerciseIndex >= exercises.count - 1,
                             onPrevious: previousExercise,
                             onCompleteCurrentSet: completeCurrentSet,
@@ -250,9 +251,16 @@ private struct WorkoutProgressHeader: View {
             VStack(spacing: 10) {
                 Group {
                     if dynamicTypeSize.isAccessibilitySize {
-                        VStack(alignment: .leading, spacing: 6) { progressLabels(at: context.date) }
+                        VStack(alignment: .leading, spacing: 6) {
+                            elapsedLabel(at: context.date)
+                            exerciseProgressLabel
+                        }
                     } else {
-                        HStack { progressLabels(at: context.date) }
+                        HStack {
+                            elapsedLabel(at: context.date)
+                            Spacer()
+                            exerciseProgressLabel
+                        }
                     }
                 }
                 ProgressView(value: session.progress)
@@ -264,12 +272,21 @@ private struct WorkoutProgressHeader: View {
         .accessibilityElement(children: .contain)
     }
 
-    @ViewBuilder private func progressLabels(at date: Date) -> some View {
-        Label(elapsedText(at: date), systemImage: "timer")
+    private func elapsedLabel(at date: Date) -> some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                Text(elapsedText(at: date))
+            } else {
+                Label(elapsedText(at: date), systemImage: "timer")
+            }
+        }
             .font(.headline)
             .monospacedDigit()
+            .accessibilityElement(children: .combine)
             .accessibilityIdentifier("workout.elapsedTime")
-        Spacer()
+    }
+
+    private var exerciseProgressLabel: some View {
         Text("动作 \(min(currentIndex + 1, max(1, totalExercises))) / \(max(1, totalExercises))")
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.secondary)
@@ -295,14 +312,29 @@ private struct ExerciseSetEditor: View {
             VStack(alignment: .leading, spacing: 6) {
                 Group {
                     if dynamicTypeSize.isAccessibilitySize {
-                        VStack(alignment: .leading, spacing: 8) { exerciseTitle }
+                        VStack(alignment: .leading, spacing: 8) {
+                            exerciseName
+                            targetRPE
+                        }
                     } else {
-                        HStack(alignment: .firstTextBaseline) { exerciseTitle }
+                        HStack(alignment: .firstTextBaseline) {
+                            exerciseName
+                            Spacer()
+                            targetRPE
+                        }
                     }
                 }
-                Label("上次最佳 · \(exercise.previousSummary)", systemImage: "clock.arrow.circlepath")
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Text("上次最佳 · \(exercise.previousSummary)")
+                    } else {
+                        Label("上次最佳 · \(exercise.previousSummary)", systemImage: "clock.arrow.circlepath")
+                    }
+                }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("workout.previousPerformance")
             }
 
@@ -331,10 +363,13 @@ private struct ExerciseSetEditor: View {
         }
     }
 
-    @ViewBuilder private var exerciseTitle: some View {
+    private var exerciseName: some View {
         Text(exercise.name)
             .font(.title.bold())
-        Spacer()
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder private var targetRPE: some View {
         if let targetRPE = exercise.targetRPE {
             MetricPill(label: "目标", value: "RPE \(targetRPE.formatted())")
         }
@@ -354,9 +389,16 @@ private struct WorkoutSetRow: View {
             VStack(spacing: 12) {
                 Group {
                     if dynamicTypeSize.isAccessibilitySize {
-                        VStack(alignment: .leading, spacing: 8) { setHeader }
+                        VStack(alignment: .leading, spacing: 8) {
+                            setNumber
+                            completionButton
+                        }
                     } else {
-                        HStack { setHeader }
+                        HStack {
+                            setNumber
+                            Spacer()
+                            completionButton
+                        }
                     }
                 }
 
@@ -379,17 +421,19 @@ private struct WorkoutSetRow: View {
         .accessibilityElement(children: .contain)
     }
 
-    @ViewBuilder private var setHeader: some View {
-                    Text("第 \(set.sortIndex + 1) 组")
-                        .font(.headline)
-                    Spacer()
-                    Button(action: onToggle) {
-                        Label(set.isCompleted ? "已完成" : "完成本组", systemImage: set.isCompleted ? "checkmark.circle.fill" : "circle")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(set.isCompleted ? AppTheme.success : AppTheme.brand)
-                    }
-                    .minimumTapTarget()
-                    .accessibilityIdentifier("workout.set.\(set.sortIndex).complete")
+    private var setNumber: some View {
+        Text("第 \(set.sortIndex + 1) 组")
+            .font(.headline)
+    }
+
+    private var completionButton: some View {
+        Button(action: onToggle) {
+            Label(set.isCompleted ? "已完成" : "完成本组", systemImage: set.isCompleted ? "checkmark.circle.fill" : "circle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(set.isCompleted ? AppTheme.success : AppTheme.brand)
+        }
+        .minimumTapTarget()
+        .accessibilityIdentifier("workout.set.\(set.sortIndex).complete")
     }
 
     @ViewBuilder private var valueControls: some View {
@@ -512,6 +556,7 @@ private struct RestTimerCard: View {
 private struct WorkoutBottomControls: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let currentSetNumber: Int?
+    let canGoPrevious: Bool
     let isLastExercise: Bool
     let onPrevious: () -> Void
     let onCompleteCurrentSet: () -> Void
@@ -524,6 +569,8 @@ private struct WorkoutBottomControls: View {
                 Image(systemName: "chevron.left")
                     .frame(width: 44, height: 44)
             }
+            .disabled(!canGoPrevious)
+            .opacity(canGoPrevious ? 1 : 0.35)
             .accessibilityLabel("上一个动作")
 
             Button(action: primaryAction) {
@@ -546,7 +593,7 @@ private struct WorkoutBottomControls: View {
     }
 
     private var primaryTitle: String {
-        if let currentSetNumber { return "完成 \(currentSetNumber) 组" }
+        if let currentSetNumber { return "完成第 \(currentSetNumber) 组" }
         return isLastExercise ? "完成本节" : "下一动作"
     }
 

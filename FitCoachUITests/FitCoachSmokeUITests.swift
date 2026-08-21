@@ -113,6 +113,9 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["workout.control.次数"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["workout.control.RPE"].exists)
         XCTAssertTrue(app.buttons["workout.completeCurrentSet"].isHittable)
+        assertHorizontallyContained(app.descendants(matching: .any)["workout.elapsedTime"].firstMatch, in: app)
+        assertHorizontallyContained(app.descendants(matching: .any)["workout.previousPerformance"].firstMatch, in: app)
+        assertHorizontallyContained(app.buttons["workout.completeCurrentSet"], in: app)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Today-and-workout-AX5"
@@ -126,5 +129,19 @@ final class FitCoachSmokeUITests: XCTestCase {
             object: element
         )
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func assertHorizontallyContained(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let window = app.windows.firstMatch.frame
+        XCTAssertTrue(element.exists, file: file, line: line)
+        let frame = element.frame
+        let glyphOverhangTolerance: CGFloat = 4
+        XCTAssertGreaterThanOrEqual(frame.minX, window.minX - glyphOverhangTolerance, file: file, line: line)
+        XCTAssertLessThanOrEqual(frame.maxX, window.maxX + glyphOverhangTolerance, file: file, line: line)
     }
 }

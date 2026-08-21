@@ -136,6 +136,52 @@ final class BackupV2Tests: XCTestCase {
         XCTAssertEqual(existing.workoutSessions.count, 1)
     }
 
+    func testImportDeepMergesMissingSetsIntoExistingSession() throws {
+        let sourceContainer = try makeContainer()
+        let source = sourceContainer.mainContext
+        let sourceStudent = Student(name: "深合并", gender: .other, age: 30, fitnessLevel: .intermediate, weightKg: 70, heightCm: 175)
+        source.insert(sourceStudent)
+        let sourceSession = WorkoutSession(title: "已有课程", status: .inProgress)
+        sourceSession.student = sourceStudent
+        source.insert(sourceSession)
+        let sourceExercise = ExerciseEntry(name: "深蹲", category: .strength, plannedSets: 2, plannedReps: 8, plannedDurationMinutes: 10)
+        sourceExercise.session = sourceSession
+        source.insert(sourceExercise)
+        let first = WorkoutSet(sortIndex: 0, actualWeightKg: 60, actualReps: 8)
+        first.exercise = sourceExercise
+        source.insert(first)
+        let second = WorkoutSet(sortIndex: 1, actualWeightKg: 62.5, actualReps: 8)
+        second.exercise = sourceExercise
+        source.insert(second)
+        try source.save()
+        let archive = try BackupV2Service.decode(BackupV2Service.encode(students: [sourceStudent], templates: []))
+
+        let destinationContainer = try makeContainer()
+        let destination = destinationContainer.mainContext
+        let localStudent = Student(name: "本地", gender: .other, age: 30, fitnessLevel: .intermediate, weightKg: 70, heightCm: 175)
+        localStudent.id = sourceStudent.id
+        destination.insert(localStudent)
+        let localSession = WorkoutSession(title: "本地课程", status: .inProgress)
+        localSession.id = sourceSession.id
+        localSession.student = localStudent
+        destination.insert(localSession)
+        let localExercise = ExerciseEntry(name: "本地深蹲", category: .strength, plannedSets: 2, plannedReps: 8, plannedDurationMinutes: 10)
+        localExercise.id = sourceExercise.id
+        localExercise.session = localSession
+        destination.insert(localExercise)
+        let localFirst = WorkoutSet(id: first.id, sortIndex: 0, actualWeightKg: 55, actualReps: 8)
+        localFirst.exercise = localExercise
+        destination.insert(localFirst)
+        try destination.save()
+
+        _ = try BackupV2Service.insert(archive, into: destination)
+
+        XCTAssertEqual(localSession.exercises.count, 1)
+        XCTAssertEqual(localExercise.sets.count, 2)
+        XCTAssertEqual(localExercise.sortedSets.first?.actualWeightKg, 55, "已有本地值应保留")
+        XCTAssertEqual(localExercise.sortedSets.last?.actualWeightKg, 62.5)
+    }
+
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(
             for: Student.self,

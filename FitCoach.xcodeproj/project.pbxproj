@@ -12,6 +12,7 @@
 		13F79B4CB2A59FD2CE08D719 /* StudentListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C795B00D06F6D1CC952B1B5 /* StudentListView.swift */; };
 		247D87F1107CED8D9C43EB7F /* Student.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84558A75B7F5569D5834EC1C /* Student.swift */; };
 		31B98CAA59DF5B0F6692B0F0 /* EditStudentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3158C2A5B5C8C552F11D831 /* EditStudentView.swift */; };
+		35B57F7192DD5BEA053476BC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8EDC482C95D021A2FA775C5B /* PrivacyInfo.xcprivacy */; };
 		459207BC5BE5ACB5E72B0D02 /* MeasurementTrendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7146554FFA44037944715C42 /* MeasurementTrendView.swift */; };
 		463CA3A631E7C1DBEE2A7FB8 /* FitCoachApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01CB85E9030E4074F6C47563 /* FitCoachApp.swift */; };
 		482AE0E389196D270D867E5B /* FitCoachSmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 815CAFB6EC8E6368893FEA93 /* FitCoachSmokeUITests.swift */; };
@@ -81,6 +82,7 @@
 		84558A75B7F5569D5834EC1C /* Student.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Student.swift; sourceTree = "<group>"; };
 		8470225FA19D89C22644FB45 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		86CDE22294BD22F279E1F24A /* SessionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
+		8EDC482C95D021A2FA775C5B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		9258FE40F7748198229C79AD /* RestNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestNotificationService.swift; sourceTree = "<group>"; };
 		93AF98198C341AEB0E7D2B0D /* DemoDataSeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoDataSeeder.swift; sourceTree = "<group>"; };
 		954781C58DB0B28999A9C41E /* SessionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionServiceTests.swift; sourceTree = "<group>"; };
@@ -159,6 +161,7 @@
 				D3BB6B3E277D345ED16128CE /* Views */,
 				8470225FA19D89C22644FB45 /* Assets.xcassets */,
 				01CB85E9030E4074F6C47563 /* FitCoachApp.swift */,
+				8EDC482C95D021A2FA775C5B /* PrivacyInfo.xcprivacy */,
 			);
 			path = FitCoach;
 			sourceTree = "<group>";
@@ -314,6 +317,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8C1755545D865747CBF1B818 /* Assets.xcassets in Resources */,
+				35B57F7192DD5BEA053476BC /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

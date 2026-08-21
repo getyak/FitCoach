@@ -6,6 +6,7 @@ import SwiftData
 struct SessionHistoryDetailView: View {
     @Bindable var session: WorkoutSession
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var activeSession: WorkoutSession?
     @State private var errorMessage: String?
 
@@ -50,20 +51,27 @@ struct SessionHistoryDetailView: View {
     private var summaryCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Label(statusText, systemImage: statusIcon)
-                        .font(.headline)
-                        .foregroundStyle(statusColor)
-                    Spacer()
-                    Text(session.date.formatted(date: .abbreviated, time: .shortened))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: 6) {
+                            statusLabel
+                            dateLabel
+                        }
+                    } else {
+                        HStack {
+                            statusLabel
+                            Spacer()
+                            dateLabel
+                        }
+                    }
                 }
 
-                HStack(spacing: 10) {
-                    historyMetric(value: "\(session.completedSetCount)/\(session.totalSetCount)", label: "完成组数")
-                    historyMetric(value: durationText, label: "训练时长")
-                    historyMetric(value: session.consumesCredit ? "1 节" : "免费", label: "课时")
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(spacing: 10) { historyMetrics }
+                    } else {
+                        HStack(spacing: 10) { historyMetrics }
+                    }
                 }
 
                 if !session.summary.isEmpty {
@@ -79,27 +87,41 @@ struct SessionHistoryDetailView: View {
     private func exerciseCard(_ exercise: ExerciseEntry) -> some View {
         AppCard {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(exercise.name).font(.title3.bold())
-                    Spacer()
-                    Text("\(exercise.sets.filter(\.isCompleted).count)/\(exercise.sets.count) 组")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: 6) {
+                            exerciseName(exercise)
+                            exerciseCount(exercise)
+                        }
+                    } else {
+                        HStack(alignment: .firstTextBaseline) {
+                            exerciseName(exercise)
+                            Spacer()
+                            exerciseCount(exercise)
+                        }
+                    }
                 }
 
                 ForEach(exercise.sortedSets) { set in
-                    HStack(spacing: 10) {
-                        Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(set.isCompleted ? AppTheme.success : Color.secondary)
-                            .accessibilityHidden(true)
-                        Text("第 \(set.sortIndex + 1) 组")
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Text(setDescription(set))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
+                    Group {
+                        if dynamicTypeSize.isAccessibilitySize {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 8) { setStatus(set) }
+                                Text(setDescription(set))
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            }
+                        } else {
+                            HStack(spacing: 10) {
+                                setStatus(set)
+                                Spacer()
+                                Text(setDescription(set))
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            }
+                        }
                     }
                     .accessibilityElement(children: .combine)
                 }
@@ -111,6 +133,43 @@ struct SessionHistoryDetailView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder private var historyMetrics: some View {
+        historyMetric(value: "\(session.completedSetCount)/\(session.totalSetCount)", label: "完成组数")
+        historyMetric(value: durationText, label: "训练时长")
+        historyMetric(value: session.consumesCredit ? "1 节" : "免费", label: "课时")
+    }
+
+    private var statusLabel: some View {
+        Label(statusText, systemImage: statusIcon)
+            .font(.headline)
+            .foregroundStyle(statusColor)
+    }
+
+    private var dateLabel: some View {
+        Text(session.date.formatted(date: .abbreviated, time: .shortened))
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+    }
+
+    private func exerciseName(_ exercise: ExerciseEntry) -> some View {
+        Text(exercise.name).font(.title3.bold())
+    }
+
+    private func exerciseCount(_ exercise: ExerciseEntry) -> some View {
+        Text("\(exercise.sets.filter(\.isCompleted).count)/\(exercise.sets.count) 组")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
+    }
+
+    @ViewBuilder private func setStatus(_ set: WorkoutSet) -> some View {
+        Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
+            .foregroundStyle(set.isCompleted ? AppTheme.success : Color.secondary)
+            .accessibilityHidden(true)
+        Text("第 \(set.sortIndex + 1) 组")
+            .font(.subheadline.weight(.semibold))
     }
 
     private func historyMetric(value: String, label: String) -> some View {

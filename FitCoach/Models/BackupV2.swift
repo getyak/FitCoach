@@ -324,22 +324,26 @@ enum BackupV2Service {
                 context.insert(measurement)
                 measurementIDs.insert(item.id)
             }
-            for item in backup.sessions where sessionsByID[item.id] == nil {
-                let session = WorkoutSession(date: item.date, title: item.title, status: item.statusCode.flatMap(WorkoutSessionStatus.init(rawValue:)) ?? .planned, consumesCredit: item.consumesCredit)
-                session.id = item.id
-                session.startedAt = item.startedAt
-                session.completedAt = item.completedAt
-                session.summary = item.summary
-                session.completionEpoch = item.completionEpoch
-                session.activeExerciseIndex = item.activeExerciseIndex
-                session.restEndsAt = item.restEndsAt
-                session.createdAt = item.createdAt
-                session.updatedAt = item.updatedAt
-                session.student = student
-                context.insert(session)
-                importedSessions[session.id] = session
-                sessionsByID[session.id] = session
-                insertExercises(item.exercises, into: session, context: context)
+            for item in backup.sessions {
+                if let existing = sessionsByID[item.id] {
+                    mergeMissingExercises(item.exercises, into: existing, context: context)
+                } else {
+                    let session = WorkoutSession(date: item.date, title: item.title, status: item.statusCode.flatMap(WorkoutSessionStatus.init(rawValue:)) ?? .planned, consumesCredit: item.consumesCredit)
+                    session.id = item.id
+                    session.startedAt = item.startedAt
+                    session.completedAt = item.completedAt
+                    session.summary = item.summary
+                    session.completionEpoch = item.completionEpoch
+                    session.activeExerciseIndex = item.activeExerciseIndex
+                    session.restEndsAt = item.restEndsAt
+                    session.createdAt = item.createdAt
+                    session.updatedAt = item.updatedAt
+                    session.student = student
+                    context.insert(session)
+                    importedSessions[session.id] = session
+                    sessionsByID[session.id] = session
+                    insertExercises(item.exercises, into: session, context: context)
+                }
             }
             for item in backup.credits where !creditIDs.contains(item.id) && !creditKeys.contains(item.idempotencyKey) {
                 let credit = CreditTransaction(id: item.id, idempotencyKey: item.idempotencyKey, amount: item.amount, kind: CreditTransactionKind(rawValue: item.kindCode) ?? .adjustment, occurredAt: item.occurredAt, note: item.note, sessionIDSnapshot: item.sessionIDSnapshot, reversesTransactionID: item.reversesTransactionID)
@@ -397,6 +401,25 @@ enum BackupV2Service {
                 set.exercise = exercise
                 context.insert(set)
             }
+        }
+    }
+
+    /// 导入采用 local-wins：保留本地已有字段，只补齐备份中缺失的动作和组。
+    private static func mergeMissingExercises(_ items: [ExerciseBackupV2], into session: WorkoutSession, context: ModelContext) {
+        var exercisesByID = Dictionary(uniqueKeysWithValues: session.exercises.map { ($0.id, $0) })
+        for item in items {
+            guard let existing = exercisesByID[item.id] else {
+                insertExercises([item], into: session, context: context)
+                continue
+            }
+
+            let existingSetIDs = Set(existing.sets.map(\.id))
+            for setItem in item.sets where !existingSetIDs.contains(setItem.id) {
+                let set = WorkoutSet(id: setItem.id, sortIndex: setItem.sortIndex, plannedWeightKg: setItem.plannedWeightKg, plannedReps: setItem.plannedReps, actualWeightKg: setItem.actualWeightKg, actualReps: setItem.actualReps, rpe: setItem.rpe, notes: setItem.notes, isCompleted: setItem.isCompleted, completedAt: setItem.completedAt)
+                set.exercise = existing
+                context.insert(set)
+            }
+            exercisesByID[item.id] = existing
         }
     }
 }
