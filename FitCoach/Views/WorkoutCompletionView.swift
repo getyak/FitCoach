@@ -23,7 +23,7 @@ struct WorkoutCompletionView: View {
                         Text("本节训练完成")
                             .font(.largeTitle.bold())
                         Text("已安全保存到 \(session.student?.name ?? "学员") 的训练记录")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                     }
                     .padding(.top, 20)
 
@@ -62,10 +62,11 @@ struct WorkoutCompletionView: View {
 
                     Button("查看体测趋势") { showingTrend = true }
                         .buttonStyle(.bordered)
+                        .tint(.primary)
                         .controlSize(.large)
 
                     Button("撤销完成并继续训练") { reopenSession() }
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                         .minimumTapTarget()
 
                     Button("返回今天", action: onDismiss)
@@ -134,7 +135,7 @@ private struct CompletionMetric: View {
                 .monospacedDigit()
             Text(label)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)

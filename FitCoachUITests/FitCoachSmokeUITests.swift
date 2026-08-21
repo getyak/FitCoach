@@ -19,7 +19,7 @@ final class FitCoachSmokeUITests: XCTestCase {
         }
     }
 
-    func testCoachCanContinuePreviousWorkoutAndConsumeOneCredit() {
+    func testCoachCanContinuePreviousWorkoutAndConsumeOneCredit() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-uiTesting", "-resetStore"]
         app.launch()
@@ -68,6 +68,11 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["completion.remainingCredits"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["8 节"].exists)
         XCTAssertTrue(app.buttons["completion.done"].exists)
+        let completionAttachment = XCTAttachment(screenshot: app.screenshot())
+        completionAttachment.name = "Workout-completion"
+        completionAttachment.lifetime = .keepAlways
+        add(completionAttachment)
+        try auditAccessibility(in: app)
     }
 
     func testWorkoutDraftAndRestTimerSurviveRelaunch() {
@@ -248,6 +253,16 @@ final class FitCoachSmokeUITests: XCTestCase {
 
         app.buttons["today.startWorkout"].tap()
         XCTAssertTrue(app.buttons["workout.completeCurrentSet"].waitForExistence(timeout: 5))
+        try auditAccessibility(in: app)
+
+        let weight = app.descendants(matching: .any)["workout.control.重量"].firstMatch
+        weight.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55)).tap()
+        XCTAssertTrue(app.textFields["workout.directInput.field"].waitForExistence(timeout: 3))
+        try auditAccessibility(in: app)
+        app.buttons["取消"].tap()
+
+        app.buttons["workout.completeCurrentSet"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["workout.restTimer"].waitForExistence(timeout: 2))
         try auditAccessibility(in: app)
     }
 
