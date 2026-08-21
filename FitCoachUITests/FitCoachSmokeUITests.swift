@@ -30,6 +30,9 @@ final class FitCoachSmokeUITests: XCTestCase {
         start.tap()
 
         XCTAssertTrue(app.descendants(matching: .any)["workout.previousPerformance"].waitForExistence(timeout: 5))
+        let plannedSecondSet = app.buttons["workout.set.1.select"]
+        XCTAssertTrue(plannedSecondSet.waitForExistence(timeout: 2))
+        XCTAssertTrue(waitForValueContaining("计划", on: plannedSecondSet, timeout: 2))
         for exerciseIndex in 0..<3 {
             for setIndex in 0..<3 {
                 let completeCurrent = app.buttons["workout.completeCurrentSet"]
@@ -67,12 +70,27 @@ final class FitCoachSmokeUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["completion.remainingCredits"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["8 节"].exists)
-        XCTAssertTrue(app.buttons["completion.done"].exists)
+        let done = app.buttons["completion.done"]
+        XCTAssertTrue(done.isHittable)
+        assertHorizontallyContained(done, in: app)
         let completionAttachment = XCTAttachment(screenshot: app.screenshot())
         completionAttachment.name = "Workout-completion"
         completionAttachment.lifetime = .keepAlways
         add(completionAttachment)
         try auditAccessibility(in: app)
+
+        let reopen = app.buttons["completion.reopen"]
+        XCTAssertTrue(reopen.exists)
+        for _ in 0..<4 where !reopen.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(reopen.isHittable)
+        reopen.tap()
+        XCTAssertTrue(app.buttons["撤销并返还 1 节课"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["8 节"].exists)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
+        XCTAssertTrue(done.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["8 节"].exists)
     }
 
     func testWorkoutDraftAndRestTimerSurviveRelaunch() {
@@ -128,8 +146,11 @@ final class FitCoachSmokeUITests: XCTestCase {
         rpeField.typeText("7.5")
         app.buttons["workout.directInput.save"].tap()
 
+        let addNote = app.buttons["workout.set.0.addNote"]
+        XCTAssertTrue(addNote.isHittable)
+        addNote.tap()
         let note = app.textFields["第 1 组备注"]
-        XCTAssertTrue(note.exists)
+        XCTAssertTrue(note.waitForExistence(timeout: 2))
         note.tap()
         note.typeText("膝盖稳定")
 
@@ -367,6 +388,14 @@ final class FitCoachSmokeUITests: XCTestCase {
     private func waitForValue(_ value: String, on element: XCUIElement, timeout: TimeInterval) -> Bool {
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value == %@", value),
+            object: element
+        )
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func waitForValueContaining(_ text: String, on element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value CONTAINS %@", text),
             object: element
         )
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed

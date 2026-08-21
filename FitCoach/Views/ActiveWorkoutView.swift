@@ -60,6 +60,7 @@ struct ActiveWorkoutView: View {
                                     ExerciseSetEditor(
                                         exercise: currentExercise,
                                         focusedSetID: focusedSetID,
+                                        isResting: session.restEndsAt != nil,
                                         onFocusSet: { focus(on: $0.id) },
                                         onSetToggle: toggleSet,
                                         onValueChange: saveDraft,
@@ -382,6 +383,7 @@ private struct ExerciseSetEditor: View {
     @AccessibilityFocusState private var accessibilityFocusedSetID: UUID?
     let exercise: ExerciseEntry
     let focusedSetID: UUID?
+    let isResting: Bool
     let onFocusSet: (WorkoutSet) -> Void
     let onSetToggle: (WorkoutSet, Int) -> Void
     let onValueChange: () -> Void
@@ -463,14 +465,16 @@ private struct ExerciseSetEditor: View {
                 .accessibilityHint("例如：右膝感觉良好")
             }
         }
-        .onChange(of: focusedSetID) { _, target in
-            guard voiceOverEnabled, let target else { return }
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(250))
-                guard !Task.isCancelled else { return }
-                accessibilityFocusedSetID = target
-            }
+        .task(id: accessibilityFocusRequestID) {
+            guard voiceOverEnabled, !isResting, let focusedSetID else { return }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            accessibilityFocusedSetID = focusedSetID
         }
+    }
+
+    private var accessibilityFocusRequestID: String {
+        "\(focusedSetID?.uuidString ?? "none"):\(isResting)"
     }
 
     private var exerciseName: some View {
@@ -492,47 +496,77 @@ private struct CompactWorkoutSetRow: View {
     let onUndo: () -> Void
 
     var body: some View {
+        Group {
+            if set.isCompleted {
+                completedRow
+            } else {
+                Button(action: onSelect) {
+                    rowContent
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("第 \(set.sortIndex + 1) 组")
+                .accessibilityValue("计划 \(accessibilitySummary)")
+                .accessibilityHint("点按编辑本组")
+                .accessibilityIdentifier("workout.set.\(set.sortIndex).select")
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    private var completedRow: some View {
         HStack(spacing: 12) {
-            Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(set.isCompleted ? AppTheme.success : Color.primary)
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(AppTheme.success)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("第 \(set.sortIndex + 1) 组")
-                    .font(.subheadline.weight(.semibold))
-                Text(summary)
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(AppTheme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            setSummary
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("第 \(set.sortIndex + 1) 组，已完成")
+                .accessibilityValue(accessibilitySummary)
 
             Spacer(minLength: 8)
 
-            if set.isCompleted {
-                Button("撤销", action: onUndo)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppTheme.secondaryText)
-                    .minimumTapTarget()
-                    .accessibilityLabel("撤销第 \(set.sortIndex + 1) 组完成")
-                    .accessibilityIdentifier("workout.set.\(set.sortIndex).complete")
-            } else {
-                Button(action: onSelect) {
-                    Label("编辑", systemImage: "chevron.right")
-                        .labelStyle(.iconOnly)
-                        .foregroundStyle(.primary)
-                }
+            Button("撤销", action: onUndo)
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.secondaryText)
                 .minimumTapTarget()
-                .accessibilityLabel("编辑第 \(set.sortIndex + 1) 组")
-            }
+                .accessibilityLabel("撤销第 \(set.sortIndex + 1) 组完成")
+                .accessibilityIdentifier("workout.set.\(set.sortIndex).complete")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if !set.isCompleted { onSelect() }
-        }
         .accessibilityElement(children: .contain)
+    }
+
+    private var rowContent: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "circle")
+                .foregroundStyle(.primary)
+                .accessibilityHidden(true)
+
+            setSummary
+            Spacer(minLength: 8)
+
+            Image(systemName: "chevron.right")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.secondaryText)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var setSummary: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("第 \(set.sortIndex + 1) 组")
+                .font(.subheadline.weight(.semibold))
+            Text(summary)
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(AppTheme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var summary: String {
@@ -544,12 +578,25 @@ private struct CompactWorkoutSetRow: View {
         if let rpe = set.rpe { parts.append("RPE \(rpe.formatted())") }
         return parts.isEmpty ? (set.isCompleted ? "已完成" : "待记录") : parts.joined(separator: " · ")
     }
+
+    private var accessibilitySummary: String {
+        let weight = set.actualWeightKg ?? set.plannedWeightKg
+        let reps = set.actualReps ?? set.plannedReps
+        var parts: [String] = []
+        if let weight { parts.append("\(weight.formatted()) 千克") }
+        if let reps { parts.append("\(reps) 次") }
+        if let rpe = set.rpe { parts.append("RPE \(rpe.formatted())") }
+        return parts.isEmpty ? (set.isCompleted ? "已完成" : "待记录") : parts.joined(separator: "，")
+    }
 }
 
 private struct WorkoutSetRow: View {
     @Bindable var set: WorkoutSet
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var valueHapticTrigger = 0
     @State private var editingMetric: WorkoutMetric?
+    @State private var showingNotes = false
+    @FocusState private var notesFocused: Bool
     let onValueChange: () -> Void
     let onValueCommit: () -> Void
     let onTextChange: () -> Void
@@ -562,17 +609,38 @@ private struct WorkoutSetRow: View {
 
                 VStack(spacing: 8) { valueControls }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("本组备注（可选）")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppTheme.secondaryText)
-                    TextField("", text: Binding(
-                        get: { set.notes },
-                        set: { set.notes = $0; onTextChange() }
-                    ))
-                    .textFieldStyle(.plain)
-                    .font(.subheadline)
-                    .accessibilityLabel("第 \(set.sortIndex + 1) 组备注")
+                if showingNotes || !set.notes.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("本组备注（可选）")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppTheme.secondaryText)
+                        TextField("", text: Binding(
+                            get: { set.notes },
+                            set: { set.notes = $0; onTextChange() }
+                        ))
+                        .focused($notesFocused)
+                        .textFieldStyle(.plain)
+                        .font(.subheadline)
+                        .accessibilityLabel("第 \(set.sortIndex + 1) 组备注")
+                    }
+                    .transition(.opacity)
+                } else {
+                    Button {
+                        showingNotes = true
+                        Task { @MainActor in
+                            await Task.yield()
+                            notesFocused = true
+                        }
+                    } label: {
+                        Label("添加备注", systemImage: "note.text.badge.plus")
+                            .font(.subheadline)
+                            .foregroundStyle(AppTheme.secondaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .minimumTapTarget()
+                    .accessibilityLabel("为第 \(set.sortIndex + 1) 组添加备注")
+                    .accessibilityIdentifier("workout.set.\(set.sortIndex).addNote")
                 }
             }
         }
@@ -580,6 +648,7 @@ private struct WorkoutSetRow: View {
         .sensoryFeedback(.selection, trigger: valueHapticTrigger)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("workout.set.\(set.sortIndex).editor")
+        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: showingNotes)
         .sheet(item: $editingMetric) { metric in
             NumericValueEditor(
                 metric: metric,

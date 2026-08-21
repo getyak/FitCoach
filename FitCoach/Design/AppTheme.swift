@@ -67,6 +67,36 @@ struct PrimaryActionButtonStyle: ButtonStyle {
     }
 }
 
+struct SecondaryActionButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: AppTheme.controlHeight)
+            .padding(.horizontal, 18)
+            .foregroundStyle(.primary)
+            .background(Color.clear, in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(
+                        Color.primary.opacity(contrast == .increased ? 0.42 : 0.22),
+                        lineWidth: contrast == .increased ? 1.5 : 1
+                    )
+            }
+            .contentShape(Capsule())
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.985 : 1))
+            .opacity(isEnabled ? (configuration.isPressed ? 0.72 : 1) : 0.38)
+            .animation(
+                reduceMotion ? nil : .spring(response: 0.26, dampingFraction: 0.86),
+                value: configuration.isPressed
+            )
+    }
+}
+
 struct FloatingTrainingChrome: ViewModifier {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
