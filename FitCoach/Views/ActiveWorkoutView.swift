@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct ActiveWorkoutView: View {
     @Bindable var session: WorkoutSession
@@ -74,7 +75,12 @@ struct ActiveWorkoutView: View {
                             }
                             .padding(.horizontal, AppTheme.pagePadding)
                             .padding(.top, 8)
-                            .padding(.bottom, session.restEndsAt == nil ? 120 : 176)
+                            .padding(.bottom, 120)
+                        }
+                        .task(id: currentExercise?.id) {
+                            await Task.yield()
+                            guard let focusedSetID else { return }
+                            proxy.scrollTo(focusedSetID, anchor: .center)
                         }
                         .onChange(of: focusedSetID) { _, target in
                             guard let target else { return }
@@ -182,6 +188,10 @@ struct ActiveWorkoutView: View {
                 try service.completeSet(set, in: session, restSeconds: restSeconds)
                 hapticTrigger += 1
                 focus(on: currentExercise?.sortedSets.first(where: { !$0.isCompleted })?.id)
+                UIAccessibility.post(
+                    notification: .announcement,
+                    argument: "第 \(set.sortIndex + 1) 组完成，休息 \(restSeconds) 秒"
+                )
                 if let restEndsAt = session.restEndsAt {
                     Task {
                         let scheduled = await RestNotificationService.schedule(
@@ -404,8 +414,6 @@ private struct ExerciseSetEditor: View {
                         if set.id == focusedSetID && !set.isCompleted {
                             WorkoutSetRow(
                                 set: set,
-                                restSeconds: exercise.plannedRestSeconds,
-                                onToggle: { onSetToggle(set, exercise.plannedRestSeconds) },
                                 onValueChange: onValueChange,
                                 onTextChange: onTextChange
                             )
@@ -477,6 +485,7 @@ private struct CompactWorkoutSetRow: View {
             if set.isCompleted {
                 Button("撤销", action: onUndo)
                     .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
                     .minimumTapTarget()
                     .accessibilityLabel("撤销第 \(set.sortIndex + 1) 组完成")
                     .accessibilityIdentifier("workout.set.\(set.sortIndex).complete")
@@ -492,6 +501,9 @@ private struct CompactWorkoutSetRow: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .contentShape(Rectangle())
+        .onTapGesture {
+            if !set.isCompleted { onSelect() }
+        }
         .overlay(alignment: .bottom) {
             Divider().padding(.leading, 44)
         }
@@ -513,28 +525,14 @@ private struct WorkoutSetRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Bindable var set: WorkoutSet
     @State private var valueHapticTrigger = 0
-    let restSeconds: Int
-    let onToggle: () -> Void
     let onValueChange: () -> Void
     let onTextChange: () -> Void
 
     var body: some View {
         AppCard {
             VStack(spacing: 12) {
-                Group {
-                    if dynamicTypeSize.isAccessibilitySize {
-                        VStack(alignment: .leading, spacing: 8) {
-                            setNumber
-                            completionButton
-                        }
-                    } else {
-                        HStack {
-                            setNumber
-                            Spacer()
-                            completionButton
-                        }
-                    }
-                }
+                setNumber
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if dynamicTypeSize.isAccessibilitySize {
                     VStack(spacing: 8) { valueControls }
@@ -554,22 +552,12 @@ private struct WorkoutSetRow: View {
         .opacity(set.isCompleted ? 0.78 : 1)
         .sensoryFeedback(.selection, trigger: valueHapticTrigger)
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("workout.set.\(set.sortIndex).editor")
     }
 
     private var setNumber: some View {
         Text("第 \(set.sortIndex + 1) 组")
             .font(.headline)
-    }
-
-    private var completionButton: some View {
-        Button(action: onToggle) {
-            Label(set.isCompleted ? "已完成" : "完成本组", systemImage: set.isCompleted ? "checkmark.circle.fill" : "circle")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(set.isCompleted ? AppTheme.success : AppTheme.brand)
-        }
-        .minimumTapTarget()
-        .accessibilityLabel(set.isCompleted ? "撤销第 \(set.sortIndex + 1) 组完成" : "完成第 \(set.sortIndex + 1) 组")
-        .accessibilityIdentifier("workout.set.\(set.sortIndex).complete")
     }
 
     @ViewBuilder private var valueControls: some View {
@@ -622,7 +610,7 @@ private struct WorkoutSetRow: View {
         if let current = set.rpe {
             set.rpe = min(10, max(1, current + amount))
         } else {
-            set.rpe = 7
+            set.rpe = amount > 0 ? 7.5 : 6.5
         }
         valueHapticTrigger += 1
         onValueChange()
@@ -701,38 +689,38 @@ private struct WorkoutBottomControls: View {
     let onFinish: () -> Void
 
     var body: some View {
-        VStack(spacing: 8) {
+        Group {
             if let restEndsAt {
                 CompactRestStatus(endDate: restEndsAt, onSkip: onSkipRest)
-            }
-
-            HStack(spacing: 10) {
-                Button(action: onPrevious) {
-                    Image(systemName: "chevron.left")
-                        .frame(width: 44, height: 44)
-                }
-                .disabled(!canGoPrevious)
-                .opacity(canGoPrevious ? 1 : 0.35)
-                .accessibilityLabel("上一个动作")
-
-                Button(action: primaryAction) {
-                    Group {
-                        if dynamicTypeSize.isAccessibilitySize {
-                            Text(currentSetNumber == nil ? primaryTitle : "完成本组")
-                        } else {
-                            Label(primaryTitle, systemImage: primaryIcon)
-                        }
+            } else {
+                HStack(spacing: 10) {
+                    Button(action: onPrevious) {
+                        Image(systemName: "chevron.left")
+                            .frame(width: 44, height: 44)
                     }
-                    .font(.headline)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 50)
+                    .disabled(!canGoPrevious)
+                    .opacity(canGoPrevious ? 1 : 0.35)
+                    .accessibilityLabel("上一个动作")
+
+                    Button(action: primaryAction) {
+                        Group {
+                            if dynamicTypeSize.isAccessibilitySize {
+                                Text(currentSetNumber == nil ? primaryTitle : "完成本组")
+                            } else {
+                                Label(primaryTitle, systemImage: primaryIcon)
+                            }
+                        }
+                        .font(.headline)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 50)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppTheme.brand)
+                    .accessibilityLabel(primaryTitle)
+                    .accessibilityIdentifier(primaryIdentifier)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(AppTheme.brand)
-                .accessibilityLabel(primaryTitle)
-                .accessibilityIdentifier(primaryIdentifier)
             }
         }
         .floatingTrainingChrome()
@@ -788,6 +776,7 @@ private struct CompactRestStatus: View {
                     .font(.subheadline.weight(.semibold))
                     .minimumTapTarget()
                     .accessibilityLabel(remaining > 0 ? "跳过休息" : "收起休息状态")
+                    .accessibilityIdentifier("workout.skipRest")
             }
             .sensoryFeedback(.success, trigger: remaining == 0)
         }

@@ -110,7 +110,12 @@ struct TodayView: View {
             }
         }
         .fullScreenCover(item: $activeSession) { session in
-            ActiveWorkoutView(session: session)
+            if ProcessInfo.processInfo.arguments.contains("-uiTestAX5") {
+                ActiveWorkoutView(session: session)
+                    .dynamicTypeSize(.accessibility5)
+            } else {
+                ActiveWorkoutView(session: session)
+            }
         }
         .alert("暂时无法开始", isPresented: Binding(
             get: { errorMessage != nil },

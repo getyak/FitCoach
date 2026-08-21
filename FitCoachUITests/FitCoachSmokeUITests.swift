@@ -35,18 +35,21 @@ final class FitCoachSmokeUITests: XCTestCase {
                 let completeCurrent = app.buttons["workout.completeCurrentSet"]
                 XCTAssertTrue(completeCurrent.waitForExistence(timeout: 2))
                 completeCurrent.tap()
+                let skipRest = app.buttons["workout.skipRest"]
+                XCTAssertTrue(skipRest.waitForExistence(timeout: 2))
                 if exerciseIndex == 0 && setIndex == 0 {
-                    let nextSet = app.buttons["workout.set.1.complete"]
+                    let nextSet = app.descendants(matching: .any)["workout.set.1.editor"]
                     XCTAssertTrue(nextSet.waitForExistence(timeout: 1))
                     XCTAssertTrue(nextSet.isHittable)
                     XCTAssertTrue(app.descendants(matching: .any)["workout.control.重量"].isHittable)
+                    XCTAssertFalse(app.buttons["workout.completeCurrentSet"].exists)
                     let attachment = XCTAttachment(screenshot: app.screenshot())
                     attachment.name = "Progressive-current-set-and-rest"
                     attachment.lifetime = .keepAlways
                     add(attachment)
                 }
+                skipRest.tap()
             }
-            XCTAssertTrue(app.descendants(matching: .any)["workout.restTimer"].waitForExistence(timeout: 2))
             if exerciseIndex < 2 {
                 let next = app.buttons["workout.nextExercise"]
                 XCTAssertTrue(next.waitForExistence(timeout: 2))
@@ -75,7 +78,7 @@ final class FitCoachSmokeUITests: XCTestCase {
         let start = app.buttons["today.startWorkout"]
         XCTAssertTrue(start.waitForExistence(timeout: 5))
         start.tap()
-        let firstSet = app.buttons["workout.set.0.complete"]
+        let firstSet = app.buttons["workout.completeCurrentSet"]
         XCTAssertTrue(firstSet.waitForExistence(timeout: 5))
         firstSet.tap()
         XCTAssertTrue(app.descendants(matching: .any)["workout.restTimer"].waitForExistence(timeout: 2))
@@ -131,8 +134,33 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertTrue(restoredWeight.waitForExistence(timeout: 5))
         XCTAssertEqual(restoredWeight.value as? String, "22.5 千克")
         XCTAssertEqual(restoredReps.value as? String, "9 次")
-        XCTAssertEqual(restoredRPE.value as? String, "7")
+        XCTAssertEqual(restoredRPE.value as? String, "7.5")
         XCTAssertEqual(app.textFields["第 1 组备注"].value as? String, "膝盖稳定")
+    }
+
+    func testLatestNumericEditSurvivesImmediateTermination() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "-resetStore"]
+        app.launch()
+
+        let start = app.buttons["today.startWorkout"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+
+        let weight = app.descendants(matching: .any)["workout.control.重量"].firstMatch
+        XCTAssertTrue(weight.waitForExistence(timeout: 5))
+        tapAdjustment(on: weight, increment: true)
+        app.terminate()
+
+        app.launchArguments = ["-uiTesting"]
+        app.launch()
+        let resume = app.buttons["today.startWorkout"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 5))
+        resume.tap()
+
+        let restoredWeight = app.descendants(matching: .any)["workout.control.重量"].firstMatch
+        XCTAssertTrue(restoredWeight.waitForExistence(timeout: 5))
+        XCTAssertEqual(restoredWeight.value as? String, "22.5 千克")
     }
 
     func testTodayPrimaryActionRemainsReachableAtAccessibilityTextSize() {
@@ -156,16 +184,31 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertFalse(name.frame.intersects(credits.frame))
 
         start.tap()
-        let completeSet = app.buttons["workout.set.0.complete"]
+        let completeSet = app.descendants(matching: .any)["workout.set.0.editor"]
         XCTAssertTrue(completeSet.waitForExistence(timeout: 5))
         XCTAssertTrue(completeSet.isHittable)
-        XCTAssertTrue(app.descendants(matching: .any)["workout.control.重量"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["workout.control.次数"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["workout.control.RPE"].exists)
+        let weight = app.descendants(matching: .any)["workout.control.重量"]
+        let reps = app.descendants(matching: .any)["workout.control.次数"]
+        let rpe = app.descendants(matching: .any)["workout.control.RPE"]
+        XCTAssertTrue(weight.isHittable)
+        XCTAssertTrue(reps.isHittable)
+        XCTAssertTrue(rpe.isHittable)
+        XCTAssertLessThan(weight.frame.midY, reps.frame.midY)
+        XCTAssertLessThan(reps.frame.midY, rpe.frame.midY)
         XCTAssertTrue(app.buttons["workout.completeCurrentSet"].isHittable)
         assertHorizontallyContained(app.descendants(matching: .any)["workout.elapsedTime"].firstMatch, in: app)
         assertHorizontallyContained(app.descendants(matching: .any)["workout.previousPerformance"].firstMatch, in: app)
         assertHorizontallyContained(app.buttons["workout.completeCurrentSet"], in: app)
+
+        app.buttons["workout.completeCurrentSet"].tap()
+        let restTimer = app.descendants(matching: .any)["workout.restTimer"]
+        let skipRest = app.buttons["workout.skipRest"]
+        XCTAssertTrue(restTimer.waitForExistence(timeout: 2))
+        XCTAssertTrue(skipRest.isHittable)
+        XCTAssertFalse(app.buttons["workout.completeCurrentSet"].exists)
+        assertHorizontallyContained(restTimer, in: app)
+        assertHorizontallyContained(skipRest, in: app)
+        XCTAssertLessThan(restTimer.frame.union(skipRest.frame).height, app.windows.firstMatch.frame.height * 0.25)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Today-and-workout-AX5"
