@@ -73,3 +73,5 @@ scripts/export_app_store.sh /tmp/FitCoach.xcarchive /tmp/FitCoach-AppStore
 可交互产品设计见 [docs/FitCoach_MVP_Prototype.html](docs/FitCoach_MVP_Prototype.html)，可直接用浏览器打开。
 
 发布资料已在仓库中准备：[隐私政策](docs/privacy.html)、[支持页面](docs/support.html)、[简体中文商店文案](docs/app-store/zh-Hans) 与 [App Store Connect 发布清单](docs/app-store/release-checklist.md)。公开 URL、真实审核联系人、分发签名和上传仍需对应账户权限。
+
+`scripts/validate_store_assets.sh` 会在本地和 CI 中校验商店文案限制、支持/隐私页面，以及 6.9 英寸截图的数量、1320 × 2868 尺寸和无透明通道要求。
