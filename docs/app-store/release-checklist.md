@@ -1,5 +1,26 @@
 # App Store Connect 发布清单
 
+## 可复现导出
+
+1. 用最终干净提交生成 Archive，并把提交写入包内：
+
+   ```sh
+   xcodebuild archive -project FitCoach.xcodeproj -scheme FitCoach \
+     -configuration Release -destination 'generic/platform=iOS' \
+     -archivePath /tmp/FitCoach.xcarchive \
+     FITCOACH_GIT_COMMIT="$(git rev-parse HEAD)"
+   ```
+
+2. 用自动签名的 App Store Connect 配置导出并验证 IPA：
+
+   ```sh
+   scripts/export_app_store.sh /tmp/FitCoach.xcarchive /tmp/FitCoach-AppStore
+   ```
+
+   这一步要求 Xcode 已登录具备发布权限的 Apple Developer 账号，且账号能够取得 Apple Distribution 证书和 App Store provisioning profile。脚本会拒绝开发签名和 `get-task-allow=true` 的 IPA。
+
+3. 在 Organizer 上传导出的构建，并等待 App Store Connect processing 与 validation 完成。本地 Archive 成功不等于服务端验收成功。
+
 ## 已由仓库和 Archive 证明
 
 - Bundle ID：`com.sasawang.FitCoach2026`

@@ -18,4 +18,4 @@ build/
 
 # Local test artifacts
 TestResults/
-Screenshots/
+/Screenshots/

@@ -49,6 +49,14 @@ scripts/release_evidence.sh /tmp/FitCoach.xcresult /tmp/FitCoach.xcarchive
 
 证据脚本会拒绝脏工作树、提交号不匹配、失败或跳过的测试、缺少扩展/隐私清单/dSYM，以及签名或 UUID 不一致的产物；开发签名不会被误报为 App Store 分发证明。
 
+Xcode 登录具备分发权限的账号后，可复现地导出并验证 App Store IPA：
+
+```bash
+scripts/export_app_store.sh /tmp/FitCoach.xcarchive /tmp/FitCoach-AppStore
+```
+
+导出脚本使用自动签名的 `app-store-connect` 配置，并拒绝 Apple Development 签名或仍含 `get-task-allow=true` 的 IPA。上传和 App Store Connect 服务端 processing 仍是独立发布门槛。
+
 ## 当前验证
 
 - 单元/集成：32 项，覆盖不追踪/暂停课时、续费流水、零完成组保护、课时只扣一次、未填写 RPE 保持未记录、撤销/重完成、复制上次、旧版备份重复导入去重、精确 V1 数据库原地升级、中间版本标记后的 UUID 自愈、畸形归档重复 ID 防护、跨学员父级 UUID 归属校验、体测历史、V1/V2 深合并与往返恢复、系统训练深链格式校验、文件型草稿保存 P95 帧预算，以及 start/stop 任务尚未启动时也由最后一次休息操作获胜。
