@@ -35,11 +35,25 @@ xcodebuild \
 
 UI 测试使用 `-uiTesting -resetStore` 注入确定性场景，不影响正常用户数据；`-uiTestAX5` 是测试专用启动参数，用于注入 SwiftUI AX5 字号，避免 iOS 26 旧 UIKit 字号参数造成假通过。
 
+发布候选 Archive 应传入当前提交并生成可追溯证据：
+
+```bash
+xcodebuild archive \
+  -project FitCoach.xcodeproj \
+  -scheme FitCoach \
+  -destination 'generic/platform=iOS' \
+  -archivePath /tmp/FitCoach.xcarchive \
+  FITCOACH_GIT_COMMIT="$(git rev-parse HEAD)"
+scripts/release_evidence.sh /tmp/FitCoach.xcresult /tmp/FitCoach.xcarchive
+```
+
+证据脚本会拒绝脏工作树、提交号不匹配、失败或跳过的测试、缺少扩展/隐私清单/dSYM，以及签名或 UUID 不一致的产物；开发签名不会被误报为 App Store 分发证明。
+
 ## 当前验证
 
-- 单元/集成：30/30，通过不追踪/暂停课时、续费流水、零完成组保护、课时只扣一次、未填写 RPE 保持未记录、撤销/重完成、复制上次、旧版备份重复导入去重、精确 V1 数据库原地升级、中间版本标记后的 UUID 自愈、畸形归档重复 ID 防护、跨学员父级 UUID 归属校验、体测历史、V1/V2 深合并与往返恢复、系统训练深链格式校验、文件型草稿保存 P95 帧预算，以及休息异步任务不会在撤销后复活旧通知或覆盖更新的计时。
+- 单元/集成：31/31，通过不追踪/暂停课时、续费流水、零完成组保护、课时只扣一次、未填写 RPE 保持未记录、撤销/重完成、复制上次、旧版备份重复导入去重、精确 V1 数据库原地升级、中间版本标记后的 UUID 自愈、畸形归档重复 ID 防护、跨学员父级 UUID 归属校验、体测历史、V1/V2 深合并与往返恢复、系统训练深链格式校验、文件型草稿保存 P95 帧预算，以及休息异步任务不会在撤销后复活旧通知、覆盖更新计时或在任务尚未启动时越过一次更晚的停止操作。
 - UI：12/12，通过启动、渐进式当前组自动推进、休息归零自动回到下一组、完整训练 9→8、强退后草稿/休息计时恢复、全字段恢复、数值调整后立即终止恢复、直接数值输入、精确训练深链热/冷启动、Today/训练页与学员/趋势/模板/我的/备份全旅程系统无障碍审计，以及 AX5 当前组/休息栏 frame 断言。
-- 全套：42/42 通过（30 个单元/集成 + 12 个 UI），0 failed / 0 skipped；来自同一次 `xcodebuild test`。
+- 全套目标：43 项（31 个单元/集成 + 12 个 UI）；发布候选必须由同一提交的一次 `xcodebuild test` 全部通过，并由证据脚本核验。
 - 系统休息计时：模拟器 ActivityKit 日志实测 `active → dismissed`；灵动岛紧凑态显示真实倒计时，跳过休息后立即结束。
 - 视觉：iPhone SE、iPhone 17 Pro、iPhone 17 Pro Max；浅色与暗色。
 - Archive：含 Live Activity Extension 的 Release device archive 构建、嵌入校验与深度签名验证通过；隐私清单位于最终 App bundle。

@@ -33,7 +33,7 @@ enum RestNotificationService {
         content.sound = .default
 
         let request = UNNotificationRequest(
-            identifier: identifier(for: sessionID, operationID: operationID),
+            identifier: identifier(for: sessionID),
             content: content,
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
         )
@@ -46,9 +46,12 @@ enum RestNotificationService {
     }
 
     static func cancel(for sessionID: UUID, operationID: UUID) {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(
-            withIdentifiers: [identifier(for: sessionID, operationID: operationID)]
-        )
+        cancelImmediately(for: sessionID)
+    }
+
+    static func cancelImmediately(for sessionID: UUID) {
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: [identifier(for: sessionID)])
     }
 
     static func cancel(for sessionID: UUID) async {
@@ -72,7 +75,7 @@ enum RestNotificationService {
         "rest:\(sessionID.uuidString):"
     }
 
-    private static func identifier(for sessionID: UUID, operationID: UUID) -> String {
-        "\(identifierPrefix(for: sessionID))\(operationID.uuidString)"
+    private static func identifier(for sessionID: UUID) -> String {
+        "\(identifierPrefix(for: sessionID))current"
     }
 }

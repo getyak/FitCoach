@@ -118,4 +118,38 @@ final class RestTimerCoordinatorTests: XCTestCase {
         XCTAssertEqual(scheduledSessionIDs, [sessionID])
         XCTAssertTrue(endedSessionIDs.isEmpty)
     }
+
+    func testPreparedStopInvalidatesStartBeforeItsTaskBegins() async {
+        let sessionID = UUID()
+        var scheduledSessionIDs: [UUID] = []
+        var immediateCancellations: [UUID] = []
+        var endedSessionIDs: [UUID] = []
+
+        let coordinator = RestTimerCoordinator(
+            upsertActivity: { _, _ in },
+            endActivity: { endedSessionIDs.append($0) },
+            scheduleNotification: { sessionID, _, _, _ in
+                scheduledSessionIDs.append(sessionID)
+                return true
+            },
+            cancelNotification: { _, _ in },
+            cancelNotificationImmediately: { immediateCancellations.append($0) },
+            cancelSessionNotifications: { _ in }
+        )
+
+        let staleStart = coordinator.prepareStart(
+            sessionID: sessionID,
+            exerciseName: "深蹲",
+            endDate: Date().addingTimeInterval(60)
+        )
+        let stop = coordinator.prepareStop(sessionID: sessionID)
+
+        let staleResult = await coordinator.performStart(staleStart)
+        await coordinator.performStop(stop)
+
+        XCTAssertTrue(staleResult)
+        XCTAssertTrue(scheduledSessionIDs.isEmpty)
+        XCTAssertEqual(endedSessionIDs, [sessionID])
+        XCTAssertEqual(immediateCancellations, [sessionID, sessionID])
+    }
 }

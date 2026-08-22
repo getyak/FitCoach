@@ -191,19 +191,20 @@ struct ActiveWorkoutView: View {
             if set.isCompleted {
                 try service.undoSet(set, in: session)
                 setUndoHapticTrigger += 1
-                Task { await RestTimerCoordinator.shared.stop(sessionID: session.id) }
+                stopSystemRestMirrors()
                 focus(on: set.id)
             } else {
                 try service.completeSet(set, in: session, restSeconds: restSeconds)
                 setCompletionHapticTrigger += 1
                 focus(on: currentExercise?.sortedSets.first(where: { !$0.isCompleted })?.id)
                 if let restEndsAt = session.restEndsAt {
+                    let operation = RestTimerCoordinator.shared.prepareStart(
+                        sessionID: session.id,
+                        exerciseName: set.exercise?.name ?? "训练",
+                        endDate: restEndsAt
+                    )
                     Task {
-                        let scheduled = await RestTimerCoordinator.shared.start(
-                            sessionID: session.id,
-                            exerciseName: set.exercise?.name ?? "训练",
-                            endDate: restEndsAt
-                        )
+                        let scheduled = await RestTimerCoordinator.shared.performStart(operation)
                         if !scheduled {
                             errorMessage = "休息提醒安排失败；计时仍会在 App 内继续。"
                         }
@@ -233,7 +234,7 @@ struct ActiveWorkoutView: View {
     private func skipRest() {
         session.restEndsAt = nil
         guard saveDraft() else { return }
-        Task { await RestTimerCoordinator.shared.stop(sessionID: session.id) }
+        stopSystemRestMirrors()
     }
 
     @discardableResult
@@ -252,7 +253,7 @@ struct ActiveWorkoutView: View {
     private func cancelSession() {
         do {
             try SessionService(context: modelContext).cancel(session)
-            Task { await RestTimerCoordinator.shared.stop(sessionID: session.id) }
+            stopSystemRestMirrors()
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
@@ -291,10 +292,15 @@ struct ActiveWorkoutView: View {
     private func completeSession() {
         do {
             try SessionService(context: modelContext).complete(session)
-            Task { await RestTimerCoordinator.shared.stop(sessionID: session.id) }
+            stopSystemRestMirrors()
             sessionCompletionHapticTrigger += 1
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func stopSystemRestMirrors() {
+        let operation = RestTimerCoordinator.shared.prepareStop(sessionID: session.id)
+        Task { await RestTimerCoordinator.shared.performStop(operation) }
     }
 }
