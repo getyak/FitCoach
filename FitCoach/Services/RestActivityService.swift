@@ -1,11 +1,14 @@
-import ActivityKit
+// ActivityKit's async handles are safe to update from this serial actor, but
+// the iOS 26 SDK has not fully annotated those handles as Sendable for Swift 6.
+@preconcurrency import ActivityKit
 import Foundation
 
-@MainActor
-enum RestActivityService {
-    private static var generations: [UUID: Int] = [:]
+actor RestActivityService {
+    static let shared = RestActivityService()
 
-    static func upsert(for sessionID: UUID, endDate: Date) async {
+    private var generations: [UUID: Int] = [:]
+
+    func upsert(for sessionID: UUID, endDate: Date) async {
         guard endDate > Date() else {
             await end(for: sessionID)
             return
@@ -45,7 +48,7 @@ enum RestActivityService {
         )
     }
 
-    static func end(for sessionID: UUID) async {
+    func end(for sessionID: UUID) async {
         let generation = beginOperation(for: sessionID)
         defer { finishOperation(generation, for: sessionID) }
         let sessionKey = sessionID.uuidString
@@ -57,7 +60,7 @@ enum RestActivityService {
         }
     }
 
-    static func endExpiredActivities(now: Date = Date()) async {
+    func endExpiredActivities(now: Date = Date()) async {
         for activity in Activity<RestActivityAttributes>.activities
         where activity.content.state.endsAt <= now {
             if let sessionID = UUID(uuidString: activity.attributes.sessionID) {
@@ -71,7 +74,7 @@ enum RestActivityService {
         }
     }
 
-    static func reconcile(sessionID: UUID, restEndsAt: Date?) async {
+    func reconcile(sessionID: UUID, restEndsAt: Date?) async {
         guard let restEndsAt, restEndsAt > Date() else {
             await end(for: sessionID)
             return
@@ -79,7 +82,7 @@ enum RestActivityService {
         await upsert(for: sessionID, endDate: restEndsAt)
     }
 
-    private static func end(_ activity: Activity<RestActivityAttributes>) async {
+    private func end(_ activity: Activity<RestActivityAttributes>) async {
         let finalContent = ActivityContent(
             state: RestActivityAttributes.ContentState(endsAt: Date()),
             staleDate: nil
@@ -87,17 +90,17 @@ enum RestActivityService {
         await activity.end(finalContent, dismissalPolicy: .immediate)
     }
 
-    private static func beginOperation(for sessionID: UUID) -> Int {
+    private func beginOperation(for sessionID: UUID) -> Int {
         let generation = (generations[sessionID] ?? 0) + 1
         generations[sessionID] = generation
         return generation
     }
 
-    private static func isCurrent(_ generation: Int, for sessionID: UUID) -> Bool {
+    private func isCurrent(_ generation: Int, for sessionID: UUID) -> Bool {
         generations[sessionID] == generation
     }
 
-    private static func finishOperation(_ generation: Int, for sessionID: UUID) {
+    private func finishOperation(_ generation: Int, for sessionID: UUID) {
         guard isCurrent(generation, for: sessionID) else { return }
         generations.removeValue(forKey: sessionID)
     }

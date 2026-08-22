@@ -32,12 +32,8 @@ final class RestTimerCoordinator {
     private var operationTokens: [UUID: UUID] = [:]
 
     init(
-        upsertActivity: @escaping ActivityUpsert = { sessionID, endDate in
-            await RestActivityService.upsert(for: sessionID, endDate: endDate)
-        },
-        endActivity: @escaping ActivityEnd = { sessionID in
-            await RestActivityService.end(for: sessionID)
-        },
+        upsertActivity: ActivityUpsert? = nil,
+        endActivity: ActivityEnd? = nil,
         scheduleNotification: @escaping NotificationSchedule = { sessionID, exerciseName, endDate, operationID in
             await RestNotificationService.schedule(
                 for: sessionID,
@@ -56,8 +52,12 @@ final class RestTimerCoordinator {
             await RestNotificationService.cancel(for: sessionID)
         }
     ) {
-        self.upsertActivity = upsertActivity
-        self.endActivity = endActivity
+        self.upsertActivity = upsertActivity ?? { sessionID, endDate in
+            await RestActivityService.shared.upsert(for: sessionID, endDate: endDate)
+        }
+        self.endActivity = endActivity ?? { sessionID in
+            await RestActivityService.shared.end(for: sessionID)
+        }
         self.scheduleNotification = scheduleNotification
         self.cancelNotification = cancelNotification
         self.cancelNotificationImmediately = cancelNotificationImmediately

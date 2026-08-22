@@ -60,11 +60,11 @@ struct AppShellView: View {
             selectedTab = .today
         }
         .task {
-            await RestActivityService.endExpiredActivities()
+            await RestActivityService.shared.endExpiredActivities()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            Task { await RestActivityService.endExpiredActivities() }
+            Task { await RestActivityService.shared.endExpiredActivities() }
         }
     }
 }

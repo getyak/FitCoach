@@ -51,13 +51,17 @@ scripts/release_evidence.sh /tmp/FitCoach.xcresult /tmp/FitCoach.xcarchive
 
 ## 当前验证
 
-- 单元/集成：31/31，通过不追踪/暂停课时、续费流水、零完成组保护、课时只扣一次、未填写 RPE 保持未记录、撤销/重完成、复制上次、旧版备份重复导入去重、精确 V1 数据库原地升级、中间版本标记后的 UUID 自愈、畸形归档重复 ID 防护、跨学员父级 UUID 归属校验、体测历史、V1/V2 深合并与往返恢复、系统训练深链格式校验、文件型草稿保存 P95 帧预算，以及休息异步任务不会在撤销后复活旧通知、覆盖更新计时或在任务尚未启动时越过一次更晚的停止操作。
+- 单元/集成：32 项，覆盖不追踪/暂停课时、续费流水、零完成组保护、课时只扣一次、未填写 RPE 保持未记录、撤销/重完成、复制上次、旧版备份重复导入去重、精确 V1 数据库原地升级、中间版本标记后的 UUID 自愈、畸形归档重复 ID 防护、跨学员父级 UUID 归属校验、体测历史、V1/V2 深合并与往返恢复、系统训练深链格式校验、文件型草稿保存 P95 帧预算，以及 start/stop 任务尚未启动时也由最后一次休息操作获胜。
 - UI：12/12，通过启动、渐进式当前组自动推进、休息归零自动回到下一组、完整训练 9→8、强退后草稿/休息计时恢复、全字段恢复、数值调整后立即终止恢复、直接数值输入、精确训练深链热/冷启动、Today/训练页与学员/趋势/模板/我的/备份全旅程系统无障碍审计，以及 AX5 当前组/休息栏 frame 断言。
-- 全套目标：43 项（31 个单元/集成 + 12 个 UI）；发布候选必须由同一提交的一次 `xcodebuild test` 全部通过，并由证据脚本核验。
+- 全套目标：44 项（32 个单元/集成 + 12 个 UI）；发布候选必须由同一提交的一次 `xcodebuild test` 全部通过，并由证据脚本核验。
 - 系统休息计时：模拟器 ActivityKit 日志实测 `active → dismissed`；灵动岛紧凑态显示真实倒计时，跳过休息后立即结束。
 - 视觉：iPhone SE、iPhone 17 Pro、iPhone 17 Pro Max；浅色与暗色。
 - Archive：含 Live Activity Extension 的 Release device archive 构建、嵌入校验与深度签名验证通过；隐私清单位于最终 App bundle。
+- 出口合规：当前仅使用 SHA-256 做本地备份收据去重，不实现非豁免加密；最终包显式声明 `ITSAppUsesNonExemptEncryption=false`，证据脚本会核验该值。
+- 并发边界：休息 Live Activity 由独立 actor 串行管理，不占用 SwiftUI 主执行器；工程在 `SWIFT_STRICT_CONCURRENCY=complete` 下构建通过。
 - 升级：测试资源包含由基线 `38151ee` 真机模拟器进程生成的 exact V1 SwiftData store（3 位学员、3 节课程、4 个动作）；当前版本可原地打开、修复迁移时重复 UUID、回填逐组/体测/课时流水，并在第二次打开时保持对象数、ID 与余额不变。同一模拟器覆盖安装当前 App 后也已成功进入迁移后的“今天”页。当前仍采用 SwiftData 推断式 schema 迁移；扩大正式发布系统范围前应继续补多 iOS 版本 fixture，并在下一次破坏性模型变化前冻结 `VersionedSchema`/`SchemaMigrationPlan`。
 
 完整验收标准见 [docs/MVP_ACCEPTANCE.md](docs/MVP_ACCEPTANCE.md)。
 可交互产品设计见 [docs/FitCoach_MVP_Prototype.html](docs/FitCoach_MVP_Prototype.html)，可直接用浏览器打开。
+
+发布资料已在仓库中准备：[隐私政策](docs/privacy.html)、[支持页面](docs/support.html)、[简体中文商店文案](docs/app-store/zh-Hans) 与 [App Store Connect 发布清单](docs/app-store/release-checklist.md)。公开 URL、真实审核联系人、分发签名和上传仍需对应账户权限。

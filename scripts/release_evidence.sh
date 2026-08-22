@@ -24,6 +24,17 @@ dsym_binary="$archive_path/dSYMs/FitCoach.app.dSYM/Contents/Resources/DWARF/FitC
 [[ -f "$app_path/PrivacyInfo.xcprivacy" ]] || { echo "Missing PrivacyInfo.xcprivacy" >&2; exit 65; }
 [[ -f "$dsym_binary" ]] || { echo "Missing app dSYM" >&2; exit 65; }
 
+non_exempt_encryption="$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$app_path/Info.plist" 2>/dev/null || true)"
+[[ "$non_exempt_encryption" == "false" ]] || {
+    echo "ITSAppUsesNonExemptEncryption must be explicitly false for this build." >&2
+    exit 65
+}
+extension_non_exempt_encryption="$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$extension_path/Info.plist" 2>/dev/null || true)"
+[[ "$extension_non_exempt_encryption" == "false" ]] || {
+    echo "Live Activity extension must explicitly declare non-exempt encryption false." >&2
+    exit 65
+}
+
 cd "$repo_root"
 if [[ -n "$(git status --porcelain)" ]]; then
     echo "Release evidence requires a clean worktree." >&2
@@ -79,6 +90,7 @@ cat <<REPORT
 - dSYM UUID: $dsym_uuid
 - Live Activity extension: present
 - Privacy manifest: present
+- Non-exempt encryption: false
 - Signing authority: $authority
 - get-task-allow: $get_task_allow
 

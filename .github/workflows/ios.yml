@@ -1,22 +1,60 @@
-name: iOS
+name: iOS verification
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
-    runs-on: macos-15
+    runs-on: macos-26
+    timeout-minutes: 35
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.6
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+
       - name: Install XcodeGen
         run: brew install xcodegen
+
       - name: Generate project
         run: xcodegen generate
-      - name: Test
+
+      - name: Verify strict concurrency boundaries
         run: |
-          xcodebuild \
+          xcodebuild build \
             -project FitCoach.xcodeproj \
             -scheme FitCoach \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
-            test CODE_SIGNING_ALLOWED=NO
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            SWIFT_STRICT_CONCURRENCY=complete \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Run unit and UI tests
+        run: |
+          xcodebuild test \
+            -project FitCoach.xcodeproj \
+            -scheme FitCoach \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' \
+            -resultBundlePath "$RUNNER_TEMP/FitCoach.xcresult" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FitCoach-xcresult-${{ github.sha }}
+          path: ${{ runner.temp }}/FitCoach.xcresult
+          if-no-files-found: error
+          retention-days: 14

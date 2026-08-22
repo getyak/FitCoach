@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FitCoach 支持</title>
+  <style>
+    :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+    body { margin: 0; background: Canvas; color: CanvasText; }
+    main { width: min(680px, calc(100% - 40px)); margin: 0 auto; padding: 72px 0 96px; }
+    h1 { margin: 0 0 12px; font-size: clamp(32px, 7vw, 52px); letter-spacing: -.035em; }
+    h2 { margin: 36px 0 10px; font-size: 19px; }
+    p, li { font-size: 17px; line-height: 1.75; }
+    .meta { color: color-mix(in srgb, CanvasText 62%, transparent); }
+    .action { display: inline-block; margin-top: 14px; padding: 13px 20px; border-radius: 999px; background: #c24512; color: white; font-weight: 650; text-decoration: none; }
+    a:not(.action) { color: #c24512; text-underline-offset: 3px; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="meta">FitCoach</p>
+    <h1>使用支持</h1>
+    <p>训练记录应该让教练更专注，而不是让教练维护软件。</p>
+    <a class="action" href="https://github.com/getyak/FitCoach/issues/new">提交问题或建议</a>
+
+    <h2>数据在哪里？</h2>
+    <p>FitCoach 的业务数据保存在当前设备。建议在“我的 → 备份与恢复”中定期导出 JSON 备份，并保存到你信任的位置。</p>
+
+    <h2>如何恢复备份？</h2>
+    <p>在“我的 → 备份与恢复”选择导入。FitCoach 会先验证文件，成功保存后才提示完成；重复导入同一新版备份不会重复增加学员或课时流水。</p>
+
+    <h2>为什么没有休息提醒？</h2>
+    <p>请在“我的”中开启休息提醒，并在系统设置中允许 FitCoach 发送通知。Live Activity 还需要系统允许“实时活动”。即使权限关闭，App 内倒计时仍会工作。</p>
+
+    <h2>如何删除数据？</h2>
+    <p>在学员详情中删除对应学员，或卸载 FitCoach 删除本机应用数据。你主动导出的备份需要在保存位置单独删除。</p>
+
+    <h2>隐私</h2>
+    <p>查看完整的 <a href="privacy.html">FitCoach 隐私政策</a>。</p>
+  </main>
+</body>
+</html>

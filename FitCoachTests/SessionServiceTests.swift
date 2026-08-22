@@ -55,8 +55,7 @@ final class SessionServiceTests: XCTestCase {
         XCTAssertEqual(student.remainingSessions, 9)
         XCTAssertEqual(student.creditTransactions.filter { $0.kind == .consume }.count, 1)
         XCTAssertEqual(session.status, .completed)
-        XCTAssertFalse(session.summary.isEmpty)
-        XCTAssertTrue(session.summary.contains("1 组"))
+        XCTAssertEqual(session.summary, "本次完成 1 个动作 · 1 组；下次沿用本次重量与次数。")
     }
 
     func testCompletingASetDoesNotInventAnUnrecordedRPE() throws {

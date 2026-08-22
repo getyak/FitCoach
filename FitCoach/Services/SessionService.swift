@@ -332,9 +332,10 @@ struct SessionService {
             exercise.sets.contains(where: \.isCompleted) || exercise.isCompleted
         }
         let completedSets = completedExercises.reduce(0) { $0 + $1.sets.filter(\.isCompleted).count }
-        let exerciseNames = completedExercises.prefix(3).map(\.name).joined(separator: "、")
-        let highlights = exerciseNames.isEmpty ? "完成本节训练" : "完成\(exerciseNames)"
-        return "本次\(highlights)，共 \(completedExercises.count) 个动作、\(completedSets) 组。下次训练建议沿用本次实际数据并根据状态微调。"
+        if completedSets > 0 {
+            return "本次完成 \(completedExercises.count) 个动作 · \(completedSets) 组；下次沿用本次重量与次数。"
+        }
+        return "本次完成 \(completedExercises.count) 个动作；下次沿用本次训练安排。"
     }
 
     private func save() throws {
