@@ -51,8 +51,10 @@ struct SettingsView: View {
                 }
             } header: {
                 Text(loc.t("数据备份"))
+                    .foregroundStyle(AppTheme.secondaryText)
             } footer: {
                 Text(loc.t("导出为一个文件，换手机或重装App后可以导入回来。"))
+                    .foregroundStyle(AppTheme.secondaryText)
             }
 
             Section {
@@ -64,12 +66,14 @@ struct SettingsView: View {
                 if let statusMessage {
                     Text(statusMessage)
                         .font(.caption)
-                        .foregroundStyle(statusIsError ? .red : .secondary)
+                        .foregroundStyle(statusIsError ? Color.red : AppTheme.secondaryText)
                 }
             } footer: {
                 Text("新备份包含逐组记录、RPE、体测、模板和课时流水。同一份新格式备份重复导入会自动跳过。")
+                    .foregroundStyle(AppTheme.secondaryText)
             }
         }
+        .protectedBottomScrollEdge()
         .navigationTitle(loc.t("设置"))
         .navigationBarTitleDisplayMode(.inline)
         .fileExporter(

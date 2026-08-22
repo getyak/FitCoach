@@ -7,6 +7,7 @@ struct WorkoutSetRow: View {
     @State private var editingMetric: WorkoutMetric?
     @State private var showingNotes = false
     @FocusState private var notesFocused: Bool
+    let isResting: Bool
     let onDraftChange: () -> Void
 
     var body: some View {
@@ -17,38 +18,40 @@ struct WorkoutSetRow: View {
 
                 VStack(spacing: 8) { valueControls }
 
-                if showingNotes || !set.notes.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("本组备注（可选）")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AppTheme.secondaryText)
-                        TextField("", text: Binding(
-                            get: { set.notes },
-                            set: { set.notes = $0; onDraftChange() }
-                        ))
-                        .focused($notesFocused)
-                        .textFieldStyle(.plain)
-                        .font(.subheadline)
-                        .accessibilityLabel("第 \(set.sortIndex + 1) 组备注")
-                    }
-                    .transition(.opacity)
-                } else {
-                    Button {
-                        showingNotes = true
-                        Task { @MainActor in
-                            await Task.yield()
-                            notesFocused = true
-                        }
-                    } label: {
-                        Label("添加备注", systemImage: "note.text.badge.plus")
+                if !isResting {
+                    if showingNotes || !set.notes.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("本组备注（可选）")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AppTheme.secondaryText)
+                            TextField("", text: Binding(
+                                get: { set.notes },
+                                set: { set.notes = $0; onDraftChange() }
+                            ))
+                            .focused($notesFocused)
+                            .textFieldStyle(.plain)
                             .font(.subheadline)
-                            .foregroundStyle(AppTheme.secondaryText)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityLabel("第 \(set.sortIndex + 1) 组备注")
+                        }
+                        .transition(.opacity)
+                    } else {
+                        Button {
+                            showingNotes = true
+                            Task { @MainActor in
+                                await Task.yield()
+                                notesFocused = true
+                            }
+                        } label: {
+                            Label("添加备注", systemImage: "note.text.badge.plus")
+                                .font(.subheadline)
+                                .foregroundStyle(AppTheme.secondaryText)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                        .minimumTapTarget()
+                        .accessibilityLabel("为第 \(set.sortIndex + 1) 组添加备注")
+                        .accessibilityIdentifier("workout.set.\(set.sortIndex).addNote")
                     }
-                    .buttonStyle(.plain)
-                    .minimumTapTarget()
-                    .accessibilityLabel("为第 \(set.sortIndex + 1) 组添加备注")
-                    .accessibilityIdentifier("workout.set.\(set.sortIndex).addNote")
                 }
             }
         }

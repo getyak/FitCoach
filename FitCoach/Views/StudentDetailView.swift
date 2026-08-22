@@ -4,6 +4,7 @@ import SwiftData
 struct StudentDetailView: View {
     @Bindable var student: Student
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showingAddSession = false
     @State private var startNewSessionImmediately = false
     @State private var showingEditStudent = false
@@ -22,15 +23,16 @@ struct StudentDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: AppTheme.sectionSpacing) {
+            LazyVStack(alignment: .leading, spacing: AppTheme.sectionSpacing) {
                 statusCard
                 if !student.safetyNotes.isEmpty { safetyCard }
                 measurementCard
                 historySection
             }
             .padding(.horizontal, AppTheme.pagePadding)
-            .padding(.bottom, 32)
+            .padding(.bottom, 112)
         }
+        .protectedBottomScrollEdge()
         .background(AppTheme.canvas)
         .navigationTitle(student.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -71,7 +73,7 @@ struct StudentDetailView: View {
                         Text(student.fitnessGoal.isEmpty ? "训练档案" : student.fitnessGoal)
                             .font(.title2.bold())
                         Text(lastCompleted.map { "上次训练 · \($0.date.formatted(date: .abbreviated, time: .omitted))" } ?? "还没有训练记录")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppTheme.secondaryText)
                     }
                     Spacer()
                     if let remaining = student.remainingSessions {
@@ -87,8 +89,7 @@ struct StudentDetailView: View {
                     startNewSessionImmediately = false
                     showingAddSession = true
                 }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
+                    .buttonStyle(SecondaryActionButtonStyle())
             }
         }
     }
@@ -100,7 +101,7 @@ struct StudentDetailView: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text("训练提醒").font(.headline)
-                Text(student.safetyNotes).foregroundStyle(.secondary)
+                Text(student.safetyNotes).foregroundStyle(.primary)
             }
         }
         .padding(16)
@@ -112,16 +113,17 @@ struct StudentDetailView: View {
     private var measurementCard: some View {
         Button { showingTrend = true } label: {
             AppCard {
-                HStack {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("体测趋势").font(.headline).foregroundStyle(.primary)
-                        Text(measurementSummary).font(.subheadline).foregroundStyle(.secondary)
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 12) {
+                        measurementLabels
+                        measurementIcon
                     }
-                    Spacer()
-                    Image(systemName: "chart.xyaxis.line")
-                        .font(.title2)
-                        .foregroundStyle(AppTheme.brand)
-                    Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                } else {
+                    HStack {
+                        measurementLabels
+                        Spacer()
+                        measurementIcon
+                    }
                 }
             }
         }
@@ -129,16 +131,42 @@ struct StudentDetailView: View {
         .accessibilityIdentifier("client.measurementTrend")
     }
 
+    private var measurementLabels: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("体测趋势").font(.headline).foregroundStyle(.primary)
+            Text(measurementSummary)
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var measurementIcon: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "chart.xyaxis.line")
+                .font(.title2)
+                .foregroundStyle(AppTheme.brand)
+            Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+        }
+    }
+
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("训练记录").font(.title3.bold())
-                Spacer()
-                Text("\(sortedSessions.count) 节").foregroundStyle(.secondary)
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("训练记录").font(.title3.bold())
+                    Text("\(sortedSessions.count) 节").foregroundStyle(AppTheme.secondaryText)
+                }
+            } else {
+                HStack {
+                    Text("训练记录").font(.title3.bold())
+                    Spacer()
+                    Text("\(sortedSessions.count) 节").foregroundStyle(AppTheme.secondaryText)
+                }
             }
             if sortedSessions.isEmpty {
                 Text("完成第一节训练后，记录会出现在这里。")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.secondaryText)
                     .padding(.vertical, 12)
             } else {
                 ForEach(sortedSessions.prefix(12)) { session in
@@ -194,26 +222,48 @@ struct StudentDetailView: View {
 
 struct WorkoutSessionRow: View {
     let session: WorkoutSession
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: statusIcon)
-                .foregroundStyle(statusColor)
-                .frame(width: 28)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(session.title.isEmpty ? "训练" : session.title).font(.headline)
-                Text(session.date.formatted(date: .abbreviated, time: .shortened))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        statusIconView
+                        Text(statusText).font(.subheadline.weight(.semibold)).foregroundStyle(statusColor)
+                    }
+                    sessionLabels
+                }
+            } else {
+                HStack(spacing: 12) {
+                    statusIconView
+                    sessionLabels
+                    Spacer()
+                    Text(statusText).font(.caption.weight(.semibold)).foregroundStyle(statusColor)
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                }
             }
-            Spacer()
-            Text(statusText).font(.caption.weight(.semibold)).foregroundStyle(statusColor)
-            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
         }
         .padding(.vertical, 6)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+
+    private var statusIconView: some View {
+        Image(systemName: statusIcon)
+            .foregroundStyle(statusColor)
+            .frame(width: 28)
+            .accessibilityHidden(true)
+    }
+
+    private var sessionLabels: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(session.title.isEmpty ? "训练" : session.title).font(.headline)
+            Text(session.date.formatted(date: .abbreviated, time: .shortened))
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.secondaryText)
+        }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var statusText: String {

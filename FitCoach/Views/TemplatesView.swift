@@ -10,15 +10,30 @@ struct TemplatesView: View {
     var body: some View {
         Group {
             if templates.isEmpty {
-                ContentUnavailableView {
-                    Label("还没有模板", systemImage: "square.stack.3d.up")
-                } description: {
-                    Text("从一次已完成训练创建，之后可为任意学员快速开始。")
-                } actions: {
-                    Button("从历史训练创建") { showingCreate = true }
-                        .buttonStyle(.borderedProminent)
-                        .tint(AppTheme.brand)
+                VStack(spacing: 18) {
+                    Image(systemName: "square.stack.3d.up")
+                        .font(.system(size: 38, weight: .medium))
+                        .foregroundStyle(AppTheme.brand)
+                        .accessibilityHidden(true)
+                    VStack(spacing: 8) {
+                        Text("还没有模板")
+                            .font(.title2.bold())
+                        Text("从一次已完成训练创建，之后可为任意学员快速开始。")
+                            .font(.body)
+                            .foregroundStyle(AppTheme.secondaryText)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Button { showingCreate = true } label: {
+                        Text("从历史训练创建")
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                        .buttonStyle(PrimaryActionButtonStyle())
+                        .accessibilityIdentifier("templates.createFromHistory")
                 }
+                .padding(AppTheme.pagePadding)
+                .frame(maxWidth: 420)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(templates) { template in
                     Button { selectedTemplate = template } label: {
@@ -42,6 +57,7 @@ struct TemplatesView: View {
                     .buttonStyle(.plain)
                 }
                 .scrollContentBackground(.hidden)
+                .protectedBottomScrollEdge()
             }
         }
         .navigationTitle("模板")
@@ -196,37 +212,64 @@ struct ProfileView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        List {
-            Section("偏好") {
-                LabeledContent("语言", value: "简体中文")
-                Text("MVP 首发聚焦中文教练场景，其他语言将在完整适配后开放。")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Toggle("休息结束提醒", isOn: $restNotificationsEnabled)
-                    .onChange(of: restNotificationsEnabled) { _, enabled in
-                        Task {
-                            guard enabled else {
-                                await RestNotificationService.cancelAll()
-                                return
-                            }
-                            let granted = await RestNotificationService.requestAuthorization()
-                            if !granted {
-                                restNotificationsEnabled = false
-                                notificationMessage = "通知权限未开启，可稍后在系统设置中允许 FitCoach 通知。"
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppTheme.sectionSpacing) {
+                VStack(alignment: .leading, spacing: 10) {
+                    profileSectionTitle("偏好")
+                    AppCard {
+                        VStack(alignment: .leading, spacing: 14) {
+                            LabeledContent("语言", value: "简体中文")
+                            Text("MVP 首发聚焦中文教练场景，其他语言将在完整适配后开放。")
+                                .foregroundStyle(AppTheme.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Divider()
+                            Toggle("休息结束提醒", isOn: $restNotificationsEnabled)
+                                .onChange(of: restNotificationsEnabled) { _, enabled in
+                                    Task {
+                                        guard enabled else {
+                                            await RestNotificationService.cancelAll()
+                                            return
+                                        }
+                                        let granted = await RestNotificationService.requestAuthorization()
+                                        if !granted {
+                                            restNotificationsEnabled = false
+                                            notificationMessage = "通知权限未开启，可稍后在系统设置中允许 FitCoach 通知。"
+                                        }
+                                    }
+                                }
+                            Text("仅在你主动开启后，于组间休息结束时发送提醒。")
+                                .foregroundStyle(AppTheme.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    profileSectionTitle("数据")
+                    NavigationLink { SettingsView() } label: {
+                        AppCard {
+                            HStack(spacing: 12) {
+                                Label("备份与恢复", systemImage: "externaldrive")
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
                             }
                         }
                     }
-                Text("仅在你主动开启后，于组间休息结束时发送提醒。")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            Section("数据") {
-                NavigationLink { SettingsView() } label: {
-                    Label("备份与恢复", systemImage: "externaldrive")
+                    .buttonStyle(.plain)
+                }
+
+                AppCard {
+                    LabeledContent("版本", value: "1.0 MVP")
                 }
             }
-            Section { LabeledContent("版本", value: "1.0 MVP") }
+            .padding(.horizontal, AppTheme.pagePadding)
+            .padding(.bottom, 120)
         }
+        .protectedBottomScrollEdge()
+        .background(AppTheme.canvas)
         .navigationTitle("我的")
         .task { await synchronizeNotificationPermission() }
         .onChange(of: scenePhase) { _, phase in
@@ -247,6 +290,12 @@ struct ProfileView: View {
         } message: {
             Text(notificationMessage ?? "请稍后重试")
         }
+    }
+
+    private func profileSectionTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.title3.bold())
+            .foregroundStyle(.primary)
     }
 
     @MainActor

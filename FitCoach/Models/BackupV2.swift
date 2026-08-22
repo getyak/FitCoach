@@ -257,6 +257,23 @@ struct BackupImportResult: Equatable {
     var skippedStudents: Int
 }
 
+private enum BackupValidationError: LocalizedError {
+    case duplicateParent(String)
+    case conflictingParent(String)
+    case invalidReference(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .duplicateParent(let object):
+            "备份中存在重复的\(object)标识，无法安全导入。"
+        case .conflictingParent(let object):
+            "备份中的\(object)归属与现有数据冲突，未导入任何内容。"
+        case .invalidReference(let object):
+            "备份中的\(object)引用无效，未导入任何内容。"
+        }
+    }
+}
+
 @MainActor
 enum BackupV2Service {
     static func encode(students: [Student], templates: [WorkoutTemplate]) throws -> Data {
@@ -277,13 +294,34 @@ enum BackupV2Service {
     }
 
     static func insert(_ archive: BackupArchiveV2, into context: ModelContext) throws -> BackupImportResult {
-        var studentsByID = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<Student>()).map { ($0.id, $0) })
-        var sessionsByID = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<WorkoutSession>()).map { ($0.id, $0) })
-        var measurementIDs = Set(try context.fetch(FetchDescriptor<BodyMeasurement>()).map(\.id))
-        var creditIDs = Set(try context.fetch(FetchDescriptor<CreditTransaction>()).map(\.id))
-        var creditKeys = Set(try context.fetch(FetchDescriptor<CreditTransaction>()).map(\.idempotencyKey))
-        var templatesByID = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<WorkoutTemplate>()).map { ($0.id, $0) })
-        var templateExerciseIDs = Set(try context.fetch(FetchDescriptor<TemplateExercise>()).map(\.id))
+        let existingStudents = try context.fetch(FetchDescriptor<Student>())
+        let existingSessions = try context.fetch(FetchDescriptor<WorkoutSession>())
+        let existingExercises = try context.fetch(FetchDescriptor<ExerciseEntry>())
+        let existingSets = try context.fetch(FetchDescriptor<WorkoutSet>())
+        let existingMeasurements = try context.fetch(FetchDescriptor<BodyMeasurement>())
+        let existingCredits = try context.fetch(FetchDescriptor<CreditTransaction>())
+        let existingTemplates = try context.fetch(FetchDescriptor<WorkoutTemplate>())
+        let existingTemplateExercises = try context.fetch(FetchDescriptor<TemplateExercise>())
+
+        try validate(
+            archive,
+            existingStudents: existingStudents,
+            existingSessions: existingSessions,
+            existingExercises: existingExercises,
+            existingSets: existingSets,
+            existingMeasurements: existingMeasurements,
+            existingCredits: existingCredits,
+            existingTemplates: existingTemplates,
+            existingTemplateExercises: existingTemplateExercises
+        )
+
+        var studentsByID = Dictionary(uniqueKeysWithValues: existingStudents.map { ($0.id, $0) })
+        var sessionsByID = Dictionary(uniqueKeysWithValues: existingSessions.map { ($0.id, $0) })
+        var measurementIDs = Set(existingMeasurements.map(\.id))
+        var creditIDs = Set(existingCredits.map(\.id))
+        var creditKeys = Set(existingCredits.map(\.idempotencyKey))
+        var templatesByID = Dictionary(uniqueKeysWithValues: existingTemplates.map { ($0.id, $0) })
+        var templateExerciseIDs = Set(existingTemplateExercises.map(\.id))
         var imported = 0
         var skipped = 0
         var importedStudents: [UUID: Student] = [:]
@@ -386,6 +424,129 @@ enum BackupV2Service {
             context.rollback()
             throw error
         }
+    }
+
+    private static func validate(
+        _ archive: BackupArchiveV2,
+        existingStudents: [Student],
+        existingSessions: [WorkoutSession],
+        existingExercises: [ExerciseEntry],
+        existingSets: [WorkoutSet],
+        existingMeasurements: [BodyMeasurement],
+        existingCredits: [CreditTransaction],
+        existingTemplates: [WorkoutTemplate],
+        existingTemplateExercises: [TemplateExercise]
+    ) throws {
+        let existingStudentIDs = Set(existingStudents.map(\.id))
+        let archiveStudentIDs = Set(archive.students.map(\.id))
+        guard archiveStudentIDs.count == archive.students.count else {
+            throw BackupValidationError.duplicateParent("学员")
+        }
+        let knownStudentIDs = existingStudentIDs.union(archiveStudentIDs)
+
+        let existingSessionsByID = Dictionary(uniqueKeysWithValues: existingSessions.map { ($0.id, $0) })
+        let existingExercisesByID = Dictionary(uniqueKeysWithValues: existingExercises.map { ($0.id, $0) })
+        let existingSetsByID = Dictionary(uniqueKeysWithValues: existingSets.map { ($0.id, $0) })
+        let existingMeasurementsByID = Dictionary(uniqueKeysWithValues: existingMeasurements.map { ($0.id, $0) })
+        let existingCreditsByID = Dictionary(uniqueKeysWithValues: existingCredits.map { ($0.id, $0) })
+        let existingTemplatesByID = Dictionary(uniqueKeysWithValues: existingTemplates.map { ($0.id, $0) })
+        let existingTemplateExercisesByID = Dictionary(uniqueKeysWithValues: existingTemplateExercises.map { ($0.id, $0) })
+
+        var sessionOwners: [UUID: UUID] = [:]
+        var exerciseOwners: [UUID: UUID] = [:]
+        var setOwners: [UUID: UUID] = [:]
+        var measurementOwners: [UUID: UUID] = [:]
+        var creditOwners: [UUID: UUID] = [:]
+        var templateExerciseOwners: [UUID: UUID] = [:]
+
+        for student in archive.students {
+            for measurement in student.measurements {
+                try register(measurement.id, parent: student.id, as: "体测记录", in: &measurementOwners)
+                if let existing = existingMeasurementsByID[measurement.id], existing.student?.id != student.id {
+                    throw BackupValidationError.conflictingParent("体测记录")
+                }
+            }
+
+            for session in student.sessions {
+                try register(session.id, parent: student.id, as: "训练课程", in: &sessionOwners)
+                if let existing = existingSessionsByID[session.id], existing.student?.id != student.id {
+                    throw BackupValidationError.conflictingParent("训练课程")
+                }
+                for exercise in session.exercises {
+                    try register(exercise.id, parent: session.id, as: "训练动作", in: &exerciseOwners)
+                    if let existing = existingExercisesByID[exercise.id], existing.session?.id != session.id {
+                        throw BackupValidationError.conflictingParent("训练动作")
+                    }
+                    for set in exercise.sets {
+                        try register(set.id, parent: exercise.id, as: "训练组", in: &setOwners)
+                        if let existing = existingSetsByID[set.id], existing.exercise?.id != exercise.id {
+                            throw BackupValidationError.conflictingParent("训练组")
+                        }
+                    }
+                }
+            }
+
+            for credit in student.credits {
+                try register(credit.id, parent: student.id, as: "课时流水", in: &creditOwners)
+                if let existing = existingCreditsByID[credit.id], existing.student?.id != student.id {
+                    throw BackupValidationError.conflictingParent("课时流水")
+                }
+                if let sessionID = credit.sessionIDSnapshot {
+                    let archiveOwner = sessionOwners[sessionID]
+                    let existingOwner = existingSessionsByID[sessionID]?.student?.id
+                    if let owner = archiveOwner ?? existingOwner, owner != student.id {
+                        throw BackupValidationError.conflictingParent("课时流水课程")
+                    }
+                }
+            }
+        }
+
+        // Credits can precede the referenced session's student in archive order,
+        // so validate the finished ownership graph in a second pass.
+        for student in archive.students {
+            for credit in student.credits {
+                guard let sessionID = credit.sessionIDSnapshot else { continue }
+                let archiveOwner = sessionOwners[sessionID]
+                let existingOwner = existingSessionsByID[sessionID]?.student?.id
+                if let owner = archiveOwner ?? existingOwner, owner != student.id {
+                    throw BackupValidationError.conflictingParent("课时流水课程")
+                }
+            }
+        }
+
+        let archiveTemplateIDs = Set(archive.templates.map(\.id))
+        guard archiveTemplateIDs.count == archive.templates.count else {
+            throw BackupValidationError.duplicateParent("训练模板")
+        }
+        for template in archive.templates {
+            if let studentID = template.studentID, !knownStudentIDs.contains(studentID) {
+                throw BackupValidationError.invalidReference("模板学员")
+            }
+            if let existing = existingTemplatesByID[template.id],
+               let archivedStudentID = template.studentID,
+               let existingStudentID = existing.student?.id,
+               existingStudentID != archivedStudentID {
+                throw BackupValidationError.conflictingParent("训练模板")
+            }
+            for exercise in template.exercises {
+                try register(exercise.id, parent: template.id, as: "模板动作", in: &templateExerciseOwners)
+                if let existing = existingTemplateExercisesByID[exercise.id], existing.template?.id != template.id {
+                    throw BackupValidationError.conflictingParent("模板动作")
+                }
+            }
+        }
+    }
+
+    private static func register(
+        _ id: UUID,
+        parent: UUID,
+        as object: String,
+        in owners: inout [UUID: UUID]
+    ) throws {
+        if let existingParent = owners[id], existingParent != parent {
+            throw BackupValidationError.conflictingParent(object)
+        }
+        owners[id] = parent
     }
 
     private static func insertExercises(_ items: [ExerciseBackupV2], into session: WorkoutSession, context: ModelContext) {

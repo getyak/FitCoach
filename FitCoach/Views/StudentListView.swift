@@ -30,6 +30,7 @@ struct StudentListView: View {
                     .listRowBackground(AppTheme.surface)
                 }
                 .scrollContentBackground(.hidden)
+                .protectedBottomScrollEdge()
             }
         }
         .background(AppTheme.canvas)
@@ -88,7 +89,7 @@ struct StudentRow: View {
         HStack(spacing: 12) {
             Text(String(student.name.prefix(1)))
                 .font(.headline)
-                .foregroundStyle(AppTheme.brand)
+                .foregroundStyle(.primary)
                 .frame(width: 42, height: 42)
                 .background(AppTheme.brand.opacity(0.12), in: Circle())
                 .accessibilityHidden(true)
@@ -96,8 +97,8 @@ struct StudentRow: View {
                 Text(student.name).font(.headline)
                 Text(lastSessionText)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .foregroundStyle(AppTheme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             if let remaining = student.remainingSessions {

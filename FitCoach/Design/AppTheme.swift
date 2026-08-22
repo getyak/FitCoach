@@ -135,6 +135,19 @@ extension View {
         frame(minWidth: 44, minHeight: 44)
             .contentShape(Rectangle())
     }
+
+    /// Keeps scrollable content legible as it approaches system glass chrome.
+    /// Older systems already use an opaque tab bar and need no override.
+    @ViewBuilder
+    func protectedBottomScrollEdge() -> some View {
+        if #available(iOS 26.0, *) {
+            scrollEdgeEffectStyle(.hard, for: .bottom)
+                .padding(.bottom, 72)
+                .background(AppTheme.canvas)
+        } else {
+            self
+        }
+    }
 }
 
 struct MetricPill: View {

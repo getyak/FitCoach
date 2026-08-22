@@ -289,6 +289,64 @@ final class BackupV2Tests: XCTestCase {
         XCTAssertEqual(imported.creditTransactions.reduce(0) { $0 + $1.amount }, 8)
     }
 
+    func testCrossStudentSessionIDCollisionRejectsArchiveWithoutPartialImport() throws {
+        let sourceContainer = try makeContainer()
+        let source = sourceContainer.mainContext
+        let firstStudent = Student(name: "甲", gender: .other, age: 30, fitnessLevel: .beginner, weightKg: 60, heightCm: 165)
+        let secondStudent = Student(name: "乙", gender: .other, age: 31, fitnessLevel: .beginner, weightKg: 70, heightCm: 175)
+        source.insert(firstStudent)
+        source.insert(secondStudent)
+        let firstSession = WorkoutSession(title: "甲的课程", status: .planned)
+        firstSession.student = firstStudent
+        source.insert(firstSession)
+        let secondSession = WorkoutSession(title: "乙的课程", status: .planned)
+        secondSession.student = secondStudent
+        source.insert(secondSession)
+        try source.save()
+
+        var archive = try BackupV2Service.decode(
+            BackupV2Service.encode(students: [firstStudent, secondStudent], templates: [])
+        )
+        archive.students[1].sessions[0].id = archive.students[0].sessions[0].id
+
+        let destinationContainer = try makeContainer()
+        let destination = destinationContainer.mainContext
+        XCTAssertThrowsError(try BackupV2Service.insert(archive, into: destination))
+        XCTAssertEqual(try destination.fetchCount(FetchDescriptor<Student>()), 0)
+        XCTAssertEqual(try destination.fetchCount(FetchDescriptor<WorkoutSession>()), 0)
+    }
+
+    func testCreditCannotReferenceAnotherStudentsSession() throws {
+        let sourceContainer = try makeContainer()
+        let source = sourceContainer.mainContext
+        let firstStudent = Student(name: "甲", gender: .other, age: 30, fitnessLevel: .beginner, weightKg: 60, heightCm: 165)
+        let secondStudent = Student(name: "乙", gender: .other, age: 31, fitnessLevel: .beginner, weightKg: 70, heightCm: 175)
+        source.insert(firstStudent)
+        source.insert(secondStudent)
+        let secondSession = WorkoutSession(title: "乙的课程", status: .completed)
+        secondSession.student = secondStudent
+        source.insert(secondSession)
+        let credit = CreditTransaction(
+            idempotencyKey: "malformed-cross-student",
+            amount: -1,
+            kind: .consume,
+            sessionIDSnapshot: secondSession.id
+        )
+        credit.student = firstStudent
+        source.insert(credit)
+        try source.save()
+
+        let archive = try BackupV2Service.decode(
+            BackupV2Service.encode(students: [firstStudent, secondStudent], templates: [])
+        )
+        let destinationContainer = try makeContainer()
+        let destination = destinationContainer.mainContext
+
+        XCTAssertThrowsError(try BackupV2Service.insert(archive, into: destination))
+        XCTAssertEqual(try destination.fetchCount(FetchDescriptor<Student>()), 0)
+        XCTAssertEqual(try destination.fetchCount(FetchDescriptor<CreditTransaction>()), 0)
+    }
+
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(
             for: Student.self,

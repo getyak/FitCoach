@@ -10,7 +10,10 @@ struct WorkoutCompletionView: View {
     @State private var showingReopenConfirmation = false
     @State private var errorMessage: String?
     @State private var summaryDraft: String = ""
+    @State private var isEditingSummary = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AccessibilityFocusState private var completionTitleFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -26,6 +29,7 @@ struct WorkoutCompletionView: View {
                             .accessibilityHidden(true)
                         Text("本节训练完成")
                             .font(.largeTitle.bold())
+                            .accessibilityFocused($completionTitleFocused)
                         Text(completionSubtitle)
                             .foregroundStyle(.primary)
                     }
@@ -46,24 +50,7 @@ struct WorkoutCompletionView: View {
                         HStack(spacing: 10) { completionMetrics }
                     }
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("给学员的总结")
-                            .font(dynamicTypeSize.isAccessibilitySize ? .headline : .title3.bold())
-                        TextEditor(text: $summaryDraft)
-                            .frame(minHeight: 108)
-                            .padding(10)
-                            .background(AppTheme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .accessibilityIdentifier("completion.summary")
-                            .onChange(of: summaryDraft) { _, newValue in
-                                session.summary = newValue
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    modelContext.rollback()
-                                    errorMessage = error.localizedDescription
-                                }
-                            }
-                    }
+                    summarySection
 
                     completionActions
 
@@ -125,6 +112,10 @@ struct WorkoutCompletionView: View {
             }
             .onAppear {
                 summaryDraft = session.summary
+                Task { @MainActor in
+                    await Task.yield()
+                    completionTitleFocused = true
+                }
             }
         }
     }
@@ -174,6 +165,55 @@ struct WorkoutCompletionView: View {
             HStack(spacing: 10) {
                 shareButton
                 trendButton
+            }
+        }
+    }
+
+    private var summarySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("给学员的总结")
+                    .font(dynamicTypeSize.isAccessibilitySize ? .headline : .title3.bold())
+                Spacer()
+                Button(isEditingSummary ? "完成编辑" : "编辑") {
+                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+                        isEditingSummary.toggle()
+                    }
+                }
+                .font(.subheadline.weight(.semibold))
+                .minimumTapTarget()
+                .accessibilityIdentifier("completion.summary.edit")
+            }
+
+            if isEditingSummary {
+                TextEditor(text: $summaryDraft)
+                    .frame(minHeight: 108)
+                    .padding(10)
+                    .background(AppTheme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .accessibilityLabel("训练总结")
+                    .accessibilityIdentifier("completion.summary.editor")
+                    .transition(.opacity)
+            } else {
+                AppCard {
+                    Text(summaryDraft.isEmpty ? "添加一条简短总结" : summaryDraft)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("训练总结")
+                .accessibilityValue(summaryDraft.isEmpty ? "未填写" : summaryDraft)
+                .accessibilityIdentifier("completion.summary")
+                .transition(.opacity)
+            }
+        }
+        .onChange(of: summaryDraft) { _, newValue in
+            session.summary = newValue
+            do {
+                try modelContext.save()
+            } catch {
+                modelContext.rollback()
+                errorMessage = error.localizedDescription
             }
         }
     }

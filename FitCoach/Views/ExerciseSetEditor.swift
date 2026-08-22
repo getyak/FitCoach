@@ -48,6 +48,7 @@ struct ExerciseSetEditor: View {
                         if set.id == focusedSetID && !set.isCompleted {
                             WorkoutSetRow(
                                 set: set,
+                                isResting: isResting,
                                 onDraftChange: onDraftChange
                             )
                             .accessibilityFocused($accessibilityFocusedSetID, equals: set.id)

@@ -86,9 +86,11 @@ struct WorkoutBottomControls: View {
 }
 
 struct CompactRestStatus: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @AccessibilityFocusState private var timerFocused: Bool
     @State private var didFinish = false
+    @State private var spokenRemaining: Int?
     let completedSetNumber: Int?
     let endDate: Date
     let onSkip: () -> Void
@@ -98,7 +100,7 @@ struct CompactRestStatus: View {
             let remaining = max(0, Int(endDate.timeIntervalSince(context.date).rounded(.up)))
             HStack(spacing: 10) {
                 Label {
-                    Text(remaining > 0 ? "休息 \(remaining) 秒" : "休息完成")
+                    Text(restVisualText(remaining: remaining))
                         .monospacedDigit()
                 } icon: {
                     Image(systemName: remaining > 0 ? "timer" : "checkmark.circle.fill")
@@ -107,7 +109,7 @@ struct CompactRestStatus: View {
                 .foregroundStyle(remaining > 0 ? Color.primary : AppTheme.success)
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(restAccessibilityLabel)
-                .accessibilityValue(remaining > 0 ? "剩余 \(remaining) 秒" : "休息完成")
+                .accessibilityValue(restAccessibilityValue(remaining: remaining))
                 .accessibilityFocused($timerFocused)
                 .accessibilityIdentifier("workout.restTimer")
 
@@ -121,9 +123,11 @@ struct CompactRestStatus: View {
             }
             .sensoryFeedback(.success, trigger: remaining == 0)
             .onChange(of: remaining) { _, newValue in
+                updateSpokenRemaining(newValue)
                 finishIfNeeded(remaining: newValue)
             }
             .task {
+                updateSpokenRemaining(remaining)
                 if voiceOverEnabled {
                     await Task.yield()
                     timerFocused = true
@@ -137,10 +141,25 @@ struct CompactRestStatus: View {
         completedSetNumber.map { "第 \($0) 组完成，休息计时" } ?? "休息计时"
     }
 
+    private func restVisualText(remaining: Int) -> String {
+        guard remaining > 0 else { return "休息完成" }
+        return dynamicTypeSize.isAccessibilitySize ? "\(remaining) 秒" : "休息 \(remaining) 秒"
+    }
+
+    private func restAccessibilityValue(remaining: Int) -> String {
+        guard remaining > 0 else { return "休息完成" }
+        return "剩余 \(spokenRemaining ?? remaining) 秒"
+    }
+
+    private func updateSpokenRemaining(_ remaining: Int) {
+        if spokenRemaining == nil || remaining == 10 || remaining == 0 {
+            spokenRemaining = remaining
+        }
+    }
+
     private func finishIfNeeded(remaining: Int) {
         guard remaining == 0, !didFinish else { return }
         didFinish = true
         onSkip()
     }
 }
-

@@ -40,6 +40,7 @@ struct MeasurementTrendView: View {
             }
             .padding(AppTheme.pagePadding)
         }
+        .protectedBottomScrollEdge()
         .background(AppTheme.canvas)
         .navigationTitle("\(student.name)的趋势")
         .navigationBarTitleDisplayMode(.inline)
@@ -50,7 +51,12 @@ struct MeasurementTrendView: View {
                     .accessibilityIdentifier("measurement.add")
             }
             ToolbarItem(placement: .confirmationAction) {
-                Button("完成") { dismiss() }
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("完成")
             }
         }
         .sheet(isPresented: $showingAddMeasurement) {
@@ -115,7 +121,7 @@ private struct AddMeasurementView: View {
                     .multilineTextAlignment(.trailing)
                     .frame(minWidth: 70)
                     .accessibilityLabel("\(title)，单位 \(unit)")
-                Text(unit).foregroundStyle(.secondary)
+                Text(unit).foregroundStyle(AppTheme.secondaryText)
             }
         }
     }
@@ -191,7 +197,7 @@ private struct TrendSummaryCard: View {
                             .font(.headline)
                         Text("最近 \(points.count) 次")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppTheme.secondaryText)
                     }
                     Spacer()
                     if points.count >= 2, let latest = points.last?.value, let delta {
@@ -201,7 +207,7 @@ private struct TrendSummaryCard: View {
                                 .monospacedDigit()
                             Text("\(delta >= 0 ? "+" : "")\(delta.formatted(.number.precision(.fractionLength(1)))) \(unit)")
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppTheme.secondaryText)
                         }
                     }
                 }
@@ -232,7 +238,7 @@ private struct TrendSummaryCard: View {
                 } else {
                     Label("该指标至少需要两次有效记录", systemImage: "chart.line.downtrend.xyaxis")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppTheme.secondaryText)
                 }
             }
         }

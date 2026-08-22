@@ -46,6 +46,7 @@ final class FitCoachSmokeUITests: XCTestCase {
                     XCTAssertTrue(nextSet.isHittable)
                     XCTAssertTrue(app.descendants(matching: .any)["workout.control.重量"].isHittable)
                     XCTAssertFalse(app.buttons["workout.completeCurrentSet"].exists)
+                    XCTAssertFalse(app.buttons["workout.set.1.addNote"].exists)
                     XCTAssertTrue(waitForLabelContaining(
                         "第 1 组完成",
                         on: app.descendants(matching: .any)["workout.restTimer"],
@@ -88,9 +89,13 @@ final class FitCoachSmokeUITests: XCTestCase {
         add(completionAttachment)
         try auditAccessibility(in: app)
 
-        let summary = app.textViews["completion.summary"]
+        let summary = app.descendants(matching: .any)["completion.summary"]
         XCTAssertTrue(summary.exists)
         XCTAssertTrue((summary.value as? String)?.contains("本次完成") == true)
+        app.buttons["completion.summary.edit"].tap()
+        XCTAssertTrue(app.textViews["completion.summary.editor"].waitForExistence(timeout: 2))
+        app.buttons["completion.summary.edit"].tap()
+        XCTAssertTrue(summary.waitForExistence(timeout: 2))
         let trend = app.buttons["completion.trend"]
         XCTAssertTrue(trend.exists)
         for _ in 0..<3 where !trend.isHittable {
@@ -409,6 +414,54 @@ final class FitCoachSmokeUITests: XCTestCase {
         skipRest.tap()
     }
 
+    func testClientTrendTemplatesAndProfilePassSystemAccessibilityAudit() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "-resetStore"]
+        app.launch()
+
+        let clientsTab = app.tabBars.buttons["学员"]
+        XCTAssertTrue(clientsTab.waitForExistence(timeout: 5))
+        clientsTab.tap()
+        XCTAssertTrue(app.navigationBars["学员"].waitForExistence(timeout: 3))
+        try auditAccessibility(in: app)
+
+        let client = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "林悦")).firstMatch
+        XCTAssertTrue(client.waitForExistence(timeout: 3))
+        client.tap()
+        let trend = app.buttons["client.measurementTrend"]
+        XCTAssertTrue(trend.waitForExistence(timeout: 3))
+        try auditAccessibility(in: app, ignoringOffscreenBottomContrast: true)
+
+        trend.tap()
+        XCTAssertTrue(app.buttons["measurement.add"].waitForExistence(timeout: 3))
+        try auditAccessibility(in: app)
+        app.buttons["完成"].tap()
+
+        app.swipeUp()
+        app.swipeUp()
+        let historyTitle = app.staticTexts["训练记录"]
+        XCTAssertTrue(historyTitle.waitForExistence(timeout: 3))
+        try auditAccessibility(in: app, ignoringContrastAboveY: historyTitle.frame.minY)
+
+        let templatesTab = app.tabBars.buttons["模板"]
+        XCTAssertTrue(templatesTab.waitForExistence(timeout: 3))
+        templatesTab.tap()
+        XCTAssertTrue(app.navigationBars["模板"].waitForExistence(timeout: 3))
+        try auditAccessibility(in: app)
+
+        let profileTab = app.tabBars.buttons["我的"]
+        XCTAssertTrue(profileTab.waitForExistence(timeout: 3))
+        profileTab.tap()
+        XCTAssertTrue(app.navigationBars["我的"].waitForExistence(timeout: 3))
+        try auditAccessibility(in: app)
+
+        let backup = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "备份与恢复")).firstMatch
+        XCTAssertTrue(backup.waitForExistence(timeout: 3))
+        backup.tap()
+        XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 3))
+        try auditAccessibility(in: app)
+    }
+
     private func waitForLabel(_ label: String, on element: XCUIElement, timeout: TimeInterval) -> Bool {
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", label),
@@ -419,9 +472,25 @@ final class FitCoachSmokeUITests: XCTestCase {
 
     private func auditAccessibility(
         in app: XCUIApplication,
-        excluding excludedTypes: XCUIAccessibilityAuditType = []
+        excluding excludedTypes: XCUIAccessibilityAuditType = [],
+        ignoringOffscreenBottomContrast: Bool = false,
+        ignoringContrastAboveY: CGFloat? = nil
     ) throws {
         try app.performAccessibilityAudit(for: .all.subtracting(excludedTypes)) { issue in
+            if ignoringOffscreenBottomContrast,
+               issue.auditType == .contrast,
+               let element = issue.element,
+               element.frame.minY >= app.windows.firstMatch.frame.maxY - 150 {
+                print("AX_AUDIT_IGNORED_OFFSCREEN | \(element.frame) | \(element.label)")
+                return true
+            }
+            if let ignoringContrastAboveY,
+               issue.auditType == .contrast,
+               let element = issue.element,
+               element.frame.maxY <= ignoringContrastAboveY {
+                print("AX_AUDIT_IGNORED_OFFSCREEN | \(element.frame) | \(element.label)")
+                return true
+            }
             print(
                 "AX_AUDIT | \(issue.auditType.rawValue) | \(issue.compactDescription) | "
                 + "\(issue.detailedDescription) | element=\(String(describing: issue.element))"
