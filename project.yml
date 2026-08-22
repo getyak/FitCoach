@@ -30,6 +30,8 @@ targets:
           - CFBundleURLName: com.sasawang.FitCoach2026.workout
             CFBundleURLSchemes:
               - fitcoach
+        FitCoachGitCommit: $(FITCOACH_GIT_COMMIT)
+        ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
@@ -53,6 +55,11 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"
         ENABLE_PREVIEWS: true
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: Apple Development
+        Release:
+          CODE_SIGN_IDENTITY: Apple Distribution
 
   FitCoachLiveActivity:
     type: app-extension

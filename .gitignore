@@ -19,3 +19,6 @@ build/
 # Local test artifacts
 TestResults/
 /Screenshots/
+
+# The separately deployed support site is its own repository.
+/support-site/

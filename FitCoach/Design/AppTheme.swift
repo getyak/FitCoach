@@ -34,6 +34,17 @@ enum AppTheme {
     /// Small supporting copy needs more contrast than the system secondary
     /// label on grouped surfaces while remaining visually quieter than body text.
     static let secondaryText = Color.primary.opacity(0.72)
+    static let paper = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.075, green: 0.073, blue: 0.067, alpha: 1)
+            : UIColor(red: 0.975, green: 0.969, blue: 0.949, alpha: 1)
+    })
+    static let inkAction = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.94, green: 0.93, blue: 0.89, alpha: 1)
+            : UIColor(red: 0.105, green: 0.10, blue: 0.09, alpha: 1)
+    })
+    static let hairline = Color.primary.opacity(0.12)
 }
 
 struct AppCard<Content: View>: View {
@@ -92,6 +103,26 @@ struct SecondaryActionButtonStyle: ButtonStyle {
             .opacity(isEnabled ? (configuration.isPressed ? 0.72 : 1) : 0.38)
             .animation(
                 reduceMotion ? nil : .spring(response: 0.26, dampingFraction: 0.86),
+                value: configuration.isPressed
+            )
+    }
+}
+
+struct EditorialPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 54)
+            .padding(.horizontal, 18)
+            .foregroundStyle(AppTheme.paper)
+            .background(AppTheme.inkAction, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .opacity(configuration.isPressed ? 0.82 : 1)
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.985 : 1))
+            .animation(
+                reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.88),
                 value: configuration.isPressed
             )
     }

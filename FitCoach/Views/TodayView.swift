@@ -53,32 +53,16 @@ struct TodayView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: AppTheme.sectionSpacing) {
+            LazyVStack(alignment: .leading, spacing: 28) {
                 TodayHeader()
 
                 if let student = focusStudent {
-                    if students.count > 1 {
-                        Menu {
-                            ForEach(students) { candidate in
-                                Button {
-                                    selectedStudentID = candidate.id
-                                } label: {
-                                    if candidate.id == student.id {
-                                        Label(candidate.name, systemImage: "checkmark")
-                                    } else {
-                                        Text(candidate.name)
-                                    }
-                                }
-                            }
-                        } label: {
-                            Label("切换学员", systemImage: "person.2")
-                        }
-                        .minimumTapTarget()
-                    }
                     FocusClientCard(
                         student: student,
                         previousSession: lastCompletedSession,
                         activeSession: focusedDraft,
+                        students: students,
+                        onSelectStudent: { selectedStudentID = $0 },
                         onStart: { startTraining(for: student) },
                         onViewTrend: { }
                     )
@@ -95,8 +79,8 @@ struct TodayView: View {
             .padding(.horizontal, AppTheme.pagePadding)
             .padding(.bottom, 32)
         }
-        .background(AppTheme.canvas)
-        .navigationTitle("今天")
+        .background(AppTheme.paper)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -184,14 +168,21 @@ private struct TodayHeader: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        Group {
-            if !dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(Date.now.formatted(.dateTime.month(.wide).day().weekday(.wide)))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppTheme.brand)
-                }
-            }
+        let headerLayout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 12))
+
+        headerLayout {
+            Text("今天")
+                .font(.largeTitle.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(Date.now.formatted(.dateTime.month(.wide).day().weekday(.wide)))
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.secondaryText)
+                .frame(
+                    maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil,
+                    alignment: .leading
+                )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 10)
@@ -203,39 +194,47 @@ private struct FocusClientCard: View {
     let student: Student
     let previousSession: WorkoutSession?
     let activeSession: WorkoutSession?
+    let students: [Student]
+    let onSelectStudent: (UUID) -> Void
     let onStart: () -> Void
     let onViewTrend: () -> Void
+    @State private var showsSafetyNote = false
 
     var body: some View {
-        AppCard {
-            VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 0) {
+            Rectangle()
+                .fill(AppTheme.brand)
+                .frame(width: 34, height: 3)
+                .accessibilityHidden(true)
+                .padding(.bottom, 20)
+
+            VStack(alignment: .leading, spacing: 18) {
                 if dynamicTypeSize.isAccessibilitySize {
                     VStack(alignment: .leading, spacing: 10) {
                         clientIdentity
                         primaryAction
                         if let remaining = student.remainingSessions {
-                            MetricPill(label: "剩余课时", value: "\(remaining) 节")
-                                .accessibilityIdentifier("today.remainingCredits")
+                            remainingCredits(remaining)
                         }
                     }
                 } else {
-                    HStack(spacing: 12) {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
                         clientIdentity
                         Spacer(minLength: 8)
                         if let remaining = student.remainingSessions {
-                            MetricPill(label: "剩", value: "\(remaining) 节")
-                                .accessibilityIdentifier("today.remainingCredits")
+                            remainingCredits(remaining)
                         }
                     }
                 }
 
                 if let previousSession {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label("上次 · \(previousSession.date.formatted(date: .abbreviated, time: .omitted))", systemImage: "clock.arrow.circlepath")
-                            .font(.subheadline.weight(.semibold))
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("上次训练  ·  \(previousSession.date.formatted(date: .abbreviated, time: .omitted))")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(AppTheme.secondaryText)
                         Text(previousSession.title.isEmpty ? "训练记录" : previousSession.title)
-                            .font(.headline)
-                        Text(previousSession.sortedExercises.prefix(3).map(\.name).joined(separator: " · "))
+                            .font(.title3.weight(.semibold))
+                        Text(previousSession.sortedExercises.prefix(3).map(\.name).joined(separator: " / "))
                             .font(.subheadline)
                             .foregroundStyle(AppTheme.secondaryText)
                     }
@@ -243,28 +242,47 @@ private struct FocusClientCard: View {
                 }
 
                 if !student.safetyNotes.isEmpty {
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "cross.case.fill")
-                            .foregroundStyle(AppTheme.warning)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("训练提醒")
-                                .font(.subheadline.weight(.semibold))
-                            Text(student.safetyNotes)
-                                .font(.subheadline)
-                                .foregroundStyle(AppTheme.secondaryText)
+                    Button {
+                        withAnimation(.spring(response: 0.34, dampingFraction: 0.9)) {
+                            showsSafetyNote.toggle()
                         }
+                    } label: {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "cross.case")
+                                .foregroundStyle(AppTheme.warning)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("训练前确认")
+                                    .font(.subheadline.weight(.semibold))
+                                if showsSafetyNote {
+                                    Text(student.safetyNotes)
+                                        .font(.subheadline)
+                                        .foregroundStyle(AppTheme.secondaryText)
+                                        .transition(.opacity.combined(with: .move(edge: .top)))
+                                }
+                            }
+                            Spacer(minLength: 8)
+                            Image(systemName: showsSafetyNote ? "minus" : "plus")
+                                .font(.caption.weight(.semibold))
+                                .frame(width: 28, height: 28)
+                                .overlay(Circle().stroke(AppTheme.hairline, lineWidth: 1))
+                                .accessibilityHidden(true)
+                        }
+                        .contentShape(Rectangle())
                     }
-                    .padding(12)
-                    .background(AppTheme.warning.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .accessibilityElement(children: .combine)
+                    .buttonStyle(.plain)
+                    .minimumTapTarget()
+                    .accessibilityLabel(showsSafetyNote ? "收起训练提醒" : "展开训练提醒")
+                    .accessibilityValue(showsSafetyNote ? student.safetyNotes : "有一条提醒")
                 }
 
                 if !dynamicTypeSize.isAccessibilitySize {
                     primaryAction
                 }
             }
+            .padding(.vertical, 18)
         }
+        .padding(.horizontal, 4)
     }
 
     private var clientIdentity: some View {
@@ -274,40 +292,82 @@ private struct FocusClientCard: View {
                     Text(statusCaption)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(AppTheme.secondaryText)
-                    Text(student.name)
-                        .font(.headline)
-                        .accessibilityIdentifier("today.focusName")
+                    studentMenu
                 }
             } else {
-                HStack(spacing: 12) {
-                    Image(systemName: "person.fill")
-                        .font(.title2.weight(.semibold))
-                        .frame(width: 48, height: 48)
-                        .foregroundStyle(.white)
-                        .background(AppTheme.primaryAction, in: Circle())
-                        .accessibilityHidden(true)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(statusCaption)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AppTheme.secondaryText)
-                        Text(student.name)
-                            .font(.title2.bold())
-                            .accessibilityIdentifier("today.focusName")
-                    }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(statusCaption)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.brand)
+                    studentMenu
                 }
             }
         }
     }
 
+    private func remainingCredits(_ remaining: Int) -> some View {
+        HStack(spacing: 5) {
+            Text("剩余")
+            Text("\(remaining) 节")
+                .monospacedDigit()
+        }
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(AppTheme.secondaryText)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("today.remainingCredits")
+    }
+
+    @ViewBuilder
+    private var studentMenu: some View {
+        if students.count > 1 {
+            Menu {
+                ForEach(students) { candidate in
+                    Button {
+                        onSelectStudent(candidate.id)
+                    } label: {
+                        if candidate.id == student.id {
+                            Label(candidate.name, systemImage: "checkmark")
+                        } else {
+                            Text(candidate.name)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 7) {
+                    studentName
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(AppTheme.secondaryText)
+                        .accessibilityHidden(true)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("当前学员 \(student.name)，切换学员")
+        } else {
+            studentName
+                .accessibilityLabel("当前学员 \(student.name)")
+        }
+    }
+
+    private var studentName: some View {
+        Text(student.name)
+            .font(dynamicTypeSize.isAccessibilitySize ? .headline : .title2.weight(.semibold))
+            .accessibilityIdentifier("today.focusName")
+    }
+
     private var primaryAction: some View {
         Button(action: onStart) {
-            Label(
-                primaryActionTitle,
-                systemImage: activeSession == nil ? "play.fill" : "arrow.right"
-            )
+            HStack {
+                Text(primaryActionTitle)
+                Spacer()
+                Image(systemName: "arrow.right")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 30, height: 30)
+                    .overlay(Circle().stroke(AppTheme.paper.opacity(0.32), lineWidth: 1))
+                    .accessibilityHidden(true)
+            }
         }
-        .buttonStyle(PrimaryActionButtonStyle())
+        .buttonStyle(EditorialPrimaryButtonStyle())
         .accessibilityIdentifier("today.startWorkout")
     }
 
@@ -333,9 +393,34 @@ private struct PreviousSessionSection: View {
     @State private var isExpanded = false
 
     var body: some View {
-        AppCard {
-            DisclosureGroup(isExpanded: $isExpanded) {
-                VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.9)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Text("上次训练")
+                        .font(.headline)
+                    Text("\(session.completedSetCount) 组")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.secondaryText)
+                    Spacer()
+                    Image(systemName: isExpanded ? "minus" : "plus")
+                        .font(.caption.weight(.semibold))
+                        .frame(width: 32, height: 32)
+                        .overlay(Circle().stroke(AppTheme.hairline, lineWidth: 1))
+                        .accessibilityHidden(true)
+                }
+                .padding(.vertical, 16)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .minimumTapTarget()
+            .accessibilityLabel(isExpanded ? "收起上次训练详情" : "展开上次训练详情")
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 14) {
                     ForEach(session.sortedExercises.prefix(3)) { exercise in
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
@@ -353,19 +438,13 @@ private struct PreviousSessionSection: View {
                         .accessibilityElement(children: .combine)
                     }
                 }
-                .padding(.top, 12)
-            } label: {
-                HStack {
-                    Label("上次训练详情", systemImage: "clock.arrow.circlepath")
-                        .font(.headline)
-                    Spacer()
-                    Text("\(session.completedSetCount) 组")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                }
+                .padding(.bottom, 18)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .tint(AppTheme.brand)
         }
+        .padding(.horizontal, 4)
+        .overlay(alignment: .top) { Rectangle().fill(AppTheme.hairline).frame(height: 0.75) }
+        .overlay(alignment: .bottom) { Rectangle().fill(AppTheme.hairline).frame(height: 0.75) }
     }
 }
 
