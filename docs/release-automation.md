@@ -6,7 +6,7 @@
 
 ## TestFlight
 
-`.github/workflows/testflight.yml` 是手动发布入口。它会：
+`.github/workflows/testflight.yml` 支持手动发布，也能在 `main` 的 iOS CI 成功后自动发布。自动模式仅在仓库变量 `TESTFLIGHT_AUTOMATION_ENABLED=true` 时启用。它会：
 
 1. 校验商店资料与截图；
 2. 在临时钥匙串导入 Apple Distribution 证书；

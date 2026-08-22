@@ -1,6 +1,9 @@
 name: TestFlight release
 
 on:
+  workflow_run:
+    workflows: [iOS verification]
+    types: [completed]
   workflow_dispatch:
     inputs:
       marketing_version:
@@ -22,12 +25,19 @@ concurrency:
 jobs:
   upload:
     name: Archive and upload
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      vars.TESTFLIGHT_AUTOMATION_ENABLED == 'true')
     runs-on: macos-26
     timeout-minutes: 45
     environment: testflight
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.6.app
@@ -81,7 +91,7 @@ jobs:
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          MARKETING_VERSION: ${{ inputs.marketing_version }}
+          MARKETING_VERSION: ${{ inputs.marketing_version || '1.0' }}
         run: |
           BUILD_NUMBER=$((1000 + GITHUB_RUN_NUMBER))
           xcodebuild archive \
