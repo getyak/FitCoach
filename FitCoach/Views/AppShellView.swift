@@ -27,19 +27,19 @@ struct AppShellView: View {
             NavigationStack {
                 TodayView(requestedWorkoutID: $requestedWorkoutID)
             }
-            .tabItem { Label("今天", systemImage: "sun.max.fill") }
+            .tabItem { Label("今天", systemImage: "sun.max") }
             .tag(AppTab.today)
 
             NavigationStack {
                 StudentListView()
             }
-            .tabItem { Label("学员", systemImage: "person.2.fill") }
+            .tabItem { Label("学员", systemImage: "person.2") }
             .tag(AppTab.clients)
 
             NavigationStack {
                 TemplatesView()
             }
-            .tabItem { Label("模板", systemImage: "square.stack.3d.up.fill") }
+            .tabItem { Label("模板", systemImage: "square.stack.3d.up") }
             .tag(AppTab.templates)
 
             NavigationStack {
