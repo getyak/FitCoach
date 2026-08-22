@@ -125,7 +125,7 @@ jobs:
 
       - name: Upload release evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: FitCoach-TestFlight-${{ github.sha }}-${{ github.run_number }}
           path: |
