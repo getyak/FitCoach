@@ -275,7 +275,35 @@ final class FitCoachSmokeUITests: XCTestCase {
         let save = app.buttons["workout.directInput.save"]
         XCTAssertTrue(save.isHittable)
         save.tap()
-        XCTAssertTrue(waitForValue("37.5 千克", on: weight, timeout: 3))
+        let valueAppearedBeforeDeadline = waitForValue("37.5 千克", on: weight, timeout: 3)
+        XCTAssertTrue(valueAppearedBeforeDeadline)
+        if !valueAppearedBeforeDeadline {
+            let sampledAt = Date().timeIntervalSince1970
+            let weightExists = weight.exists
+            let observedValue: Any? = weightExists ? weight.value : nil
+            let valueDescription = weightExists
+                ? (observedValue.map { String(String(describing: $0).prefix(256)) } ?? "<nil>")
+                : "<element absent>"
+            let valueType = observedValue.map { String(describing: type(of: $0)) } ?? "<nil>"
+            let details = XCTAttachment(string: """
+                Observed after the original 3-second assertion failed.
+                Sequential observations; not an atomic snapshot at the deadline.
+                samplingStartedAtUnixSeconds: \(sampledAt)
+                weightExists: \(weightExists)
+                weightValue: \(valueDescription)
+                weightValueType: \(valueType)
+                inputFieldExists: \(field.exists)
+                saveButtonExists: \(save.exists)
+                """)
+            details.name = "Direct-numeric-input-after-save-AX-state"
+            details.lifetime = .keepAlways
+            add(details)
+
+            let screen = XCTAttachment(screenshot: app.screenshot())
+            screen.name = "Direct-numeric-input-after-save-failure"
+            screen.lifetime = .keepAlways
+            add(screen)
+        }
 
         app.terminate()
         app.launchArguments = ["-uiTesting"]
@@ -433,7 +461,29 @@ final class FitCoachSmokeUITests: XCTestCase {
         try auditAccessibility(in: app, ignoringOffscreenBottomContrast: true)
 
         trend.tap()
-        XCTAssertTrue(app.buttons["measurement.add"].waitForExistence(timeout: 3))
+        let addMeasurement = app.buttons["measurement.add"]
+        let trendAppearedBeforeDeadline = addMeasurement.waitForExistence(timeout: 3)
+        XCTAssertTrue(trendAppearedBeforeDeadline)
+        if !trendAppearedBeforeDeadline {
+            let sampledAt = Date().timeIntervalSince1970
+            let details = XCTAttachment(string: """
+                Observed after the original 3-second assertion failed.
+                Sequential observations; not an atomic snapshot at the deadline.
+                samplingStartedAtUnixSeconds: \(sampledAt)
+                addMeasurementExists: \(addMeasurement.exists)
+                trendButtonExists: \(trend.exists)
+                doneButtonExists: \(app.buttons["完成"].exists)
+                """)
+            details.name = "Client-trend-navigation-failure-state"
+            details.lifetime = .keepAlways
+            add(details)
+
+            let screen = XCTAttachment(screenshot: app.screenshot())
+            screen.name = "Client-trend-navigation-failure"
+            screen.lifetime = .keepAlways
+            add(screen)
+            return
+        }
         try auditAccessibility(in: app)
         app.buttons["完成"].tap()
 
