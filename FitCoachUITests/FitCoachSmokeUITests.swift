@@ -459,6 +459,7 @@ final class FitCoachSmokeUITests: XCTestCase {
         XCTAssertTrue(backup.waitForExistence(timeout: 3))
         backup.tap()
         XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["导出数据"].waitForExistence(timeout: 3))
         try auditAccessibility(in: app)
     }
 
@@ -476,6 +477,7 @@ final class FitCoachSmokeUITests: XCTestCase {
         ignoringOffscreenBottomContrast: Bool = false,
         ignoringContrastAboveY: CGFloat? = nil
     ) throws {
+        guard waitForAppleIntelligenceNoticeToClear() else { return }
         try app.performAccessibilityAudit(for: .all.subtracting(excludedTypes)) { issue in
             if ignoringOffscreenBottomContrast,
                issue.auditType == .contrast,
@@ -497,6 +499,28 @@ final class FitCoachSmokeUITests: XCTestCase {
             )
             return false
         }
+    }
+
+    private func waitForAppleIntelligenceNoticeToClear() -> Bool {
+        // A first-boot Settings notification can cover the app while its own
+        // navigation bar already exists. Audit the unobscured app once; never
+        // ignore contrast issues or retry a failed audit.
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let notice = springboard.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Ready for Apple Intelligence"))
+            .firstMatch
+        if notice.exists {
+            print("AX_AUDIT_WAIT_SYSTEM_NOTICE | Ready for Apple Intelligence")
+        }
+        let cleared = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: notice
+        )
+        guard XCTWaiter.wait(for: [cleared], timeout: 10) == .completed else {
+            XCTFail("Apple Intelligence system notice still obscures the app; accessibility audit was not run.")
+            return false
+        }
+        return true
     }
 
     private func waitForLabelContaining(_ text: String, on element: XCUIElement, timeout: TimeInterval) -> Bool {
